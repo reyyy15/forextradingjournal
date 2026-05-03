@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIX | Fixing Your Execution</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: #fff; scroll-behavior: smooth; }
+        .glass-panel { background: rgba(255,255,255,0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; }
+        .hidden-view { display: none !important; }
+        select, input, textarea { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 4px; padding: 0.8rem 1.5rem; width: 100%; appearance: none; outline: none; }
+        option { background-color: #0f172a; color: white; }
+        label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 6px; display: block; letter-spacing: 1.5px; }
+        .btn-white { background: #fff; color: #000; font-weight: 800; padding: 1rem 2rem; border-radius: 4px; text-transform: uppercase; font-size: 12px; transition: 0.3s; cursor: pointer; }
+        .btn-white:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,255,255,0.1); }
+        .btn-blue { background: #3b82f6; color: #fff; font-weight: 800; padding: 1rem 2rem; border-radius: 4px; text-transform: uppercase; font-size: 12px; transition: 0.3s; cursor: pointer; }
+        .btn-emerald { background: #10b981; color: #fff; font-weight: 800; padding: 1rem 2rem; border-radius: 4px; text-transform: uppercase; font-size: 12px; transition: 0.3s; cursor: pointer; border: none; }
+        .btn-emerald:hover { background: #059669; transform: translateY(-1px); }
+        .section-pad { padding: 120px 24px; }
+        .text-gradient { background: linear-gradient(135deg, #fff 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .delete-btn { position: absolute; top: 12px; right: 12px; z-index: 50; background: rgba(239,68,68,0.15); color: #ef4444; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; border: 1px solid rgba(239,68,68,0.3); font-size: 12px; }
+        .nav-link.active { color: #3b82f6; background: rgba(59,130,246,0.1); border-left: 3px solid #3b82f6; border-radius: 4px; }
+        .alpha-badge { width: 44px; height: 44px; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-weight: 800; font-size: 22px; }
+        .real-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08)); border: 1px solid rgba(16,185,129,0.5); color: #10b981; font-size: 10px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; padding: 4px 10px; border-radius: 4px; box-shadow: 0 0 12px rgba(16,185,129,0.2), inset 0 0 8px rgba(16,185,129,0.05); animation: pulse-border 2s infinite; }
+        .real-dot { width: 7px; height: 7px; background: #10b981; border-radius: 50%; box-shadow: 0 0 6px #10b981; animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 6px #10b981} 50%{opacity:0.3;box-shadow:none} }
+        @keyframes pulse-border { 0%,100%{box-shadow:0 0 12px rgba(16,185,129,0.2),inset 0 0 8px rgba(16,185,129,0.05)} 50%{box-shadow:0 0 20px rgba(16,185,129,0.35),inset 0 0 8px rgba(16,185,129,0.08)} }
+        .editable-name { background: none; border: none; outline: none; color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 2.25rem; font-style: italic; text-transform: uppercase; line-height: 1; cursor: text; border-bottom: 1px dashed rgba(255,255,255,0.15); transition: border-color 0.2s; max-width: 320px; }
+        .editable-name:focus { border-bottom-color: #3b82f6; }
+        .equity-locked { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 2.25rem; color: #fff; line-height: 1; user-select: none; pointer-events: none; }
+        .lock-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #475569; font-size: 8px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; margin-top: 4px; }
+        .cal-header { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; text-align: center; padding: 4px 0; letter-spacing: 1px; }
+        .cal-day { aspect-ratio: 1/1; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; border: 1px solid rgba(255,255,255,0.05); transition: transform 0.15s; }
+        .cal-day:hover { transform: scale(1.05); }
+        .cal-profit { background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #34d399; }
+        .cal-loss { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #f87171; }
+        .cal-breakeven { background: rgba(59,130,246,0.2); border: 1px solid #3b82f6; color: #60a5fa; }
+        .cal-empty { opacity: 0; pointer-events: none; }
+        .img-upload-zone { border: 2px dashed rgba(255,255,255,0.15); border-radius: 4px; padding: 1.5rem; text-align: center; cursor: pointer; transition: 0.3s; }
+        .img-upload-zone:hover { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.05); }
+        .trade-img { width: 100%; border-radius: 4px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; max-height: 180px; object-fit: cover; transition: opacity 0.2s; }
+        .trade-img:hover { opacity: 0.85; }
+        .img-preview-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(59,130,246,0.4); margin-top: 8px; }
+        .upload-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+        .upload-progress-bar { height: 100%; background: #3b82f6; width: 0%; transition: width 0.3s; }
+        #equityChart { width: 100%; height: 220px; display: block; }
+        .chart-tooltip { position: absolute; background: rgba(10,15,30,0.95); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 12px; pointer-events: none; font-size: 11px; font-weight: 800; color: #fff; white-space: nowrap; z-index: 10; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .chart-wrap { position: relative; }
+        #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        #lightboxClose { position: absolute; top: 20px; right: 20px; color: #fff; font-size: 28px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+        #dayModal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); padding: 24px; }
+        #dayModalBox { background: #0b1120; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; width: 100%; max-width: 640px; max-height: 85vh; overflow-y: auto; }
+        .day-trade-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+        .cal-day.has-trades { cursor: pointer; }
+        .cal-day.has-trades:hover { transform: scale(1.08); box-shadow: 0 0 14px rgba(255,255,255,0.08); }
+
+        /* ── SIDEBAR COLLAPSE ── */
+        #dashboardAside {
+            width: 256px;
+            transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #dashboardAside.collapsed {
+            width: 52px;
+        }
+        #dashboardAside.collapsed .sidebar-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #dashboardAside.collapsed .sidebar-logo {
+            opacity: 0;
+        }
+        /* Keep toggle button always visible even when collapsed */
+        #dashboardAside.collapsed #sidebarToggle {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        .sidebar-content {
+            transition: opacity 0.2s ease;
+            opacity: 1;
+        }
+        .sidebar-logo {
+            transition: opacity 0.2s ease;
+        }
+        /* Toggle button */
+        #sidebarToggle {
+            position: static;
+            width: 28px;
+            height: 28px;
+            background: #0f1e3d;
+            border: 1px solid rgba(59,130,246,0.4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+            box-shadow: 0 0 12px rgba(59,130,246,0.25);
+            flex-shrink: 0;
+        }
+        #sidebarToggle:hover {
+            background: rgba(59,130,246,0.25);
+            box-shadow: 0 0 18px rgba(59,130,246,0.5);
+            border-color: #3b82f6;
+        }
+        #sidebarToggle svg {
+            width: 13px;
+            height: 13px;
+            color: #3b82f6;
+            transition: transform 0.3s;
+        }
+        #dashboardAside.collapsed #sidebarToggle svg {
+            transform: rotate(180deg);
+        }
+        /* Collapsed NIX mini logo */
+        .sidebar-mini-logo {
+            display: none;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 13px;
+            font-weight: 800;
+            font-style: italic;
+            color: #3b82f6;
+            letter-spacing: 3px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(180deg);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #dashboardAside.collapsed .sidebar-mini-logo {
+            display: block;
+        }
+
+        /* ── PDF REPORT SECTION ── */
+        .report-panel { background: linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(59,130,246,0.06) 100%); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; padding: 32px; }
+        .report-input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 6px; padding: 14px 18px; width: 100%; outline: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; transition: border-color 0.2s; }
+        .report-input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+        .report-input::placeholder { color: #475569; }
+        .report-stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 16px 20px; text-align: center; }
+        .pdf-btn { display: inline-flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; padding: 14px 28px; border-radius: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; cursor: pointer; border: none; transition: all 0.25s; box-shadow: 0 4px 20px rgba(16,185,129,0.3); }
+        .pdf-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(16,185,129,0.45); }
+        .pdf-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .pdf-btn svg { width: 16px; height: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        .report-note { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; text-align: center; }
+        .preview-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
+        .preview-tag.profit { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #34d399; }
+        .preview-tag.loss { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #f87171; }
+        .preview-tag.neutral { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.4); color: #60a5fa; }
+    </style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="landingView">
+    <nav class="fixed w-full z-50 top-0 border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-xl font-black italic tracking-tighter">NIX</div>
+            <div class="hidden md:flex items-center gap-8 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <a href="#problem" class="hover:text-white">The Problem</a>
+                <a href="#features" class="hover:text-white">Features</a>
+                <a href="#coach" class="hover:text-white">AI Coach</a>
+            </div>
+            <button onclick="toggleModal('loginModal')" class="btn-white !py-2 !px-6 !text-[10px]">Access Terminal</button>
+        </div>
+    </nav>
+    <section class="min-h-screen flex flex-col items-center justify-center text-center px-6 pt-20">
+        <div data-aos="fade-up">
+            <p class="text-blue-500 font-black tracking-[0.4em] uppercase text-[10px] mb-6">Built for traders who are serious about winning.</p>
+            <h1 class="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-8">Your Trades Don't Need Tracking…<br><span class="text-gradient italic">They Need Fixing.</span></h1>
+            <p class="max-w-2xl mx-auto text-gray-400 text-lg mb-10 leading-relaxed font-light">NIX is your AI-powered trading brain that analyzes every trade, identifies your mistakes, and helps you become consistently profitable.</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                <button onclick="toggleModal('loginModal')" class="btn-white">Start Free Trial</button>
+                <button class="glass-panel px-8 py-4 font-black uppercase text-[12px] hover:bg-white/5">Join Waitlist</button>
+            </div>
+        </div>
+    </section>
+    <section id="problem" class="section-pad bg-white/[0.01]">
+        <div class="max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+                <div data-aos="fade-right">
+                    <h2 class="text-4xl font-black italic mb-6 uppercase">Why 90% of Traders<br><span class="text-red-500">Never Make Money</span></h2>
+                    <p class="text-gray-500 font-bold mb-10">The problem isn't your strategy. It's your behavior.</p>
+                </div>
+                <div class="space-y-4" data-aos="fade-left">
+                    <div class="glass-panel p-6 border-l-4 border-red-500/50 flex items-center gap-4"><i data-lucide="x-circle" class="text-red-500"></i><p class="text-sm font-bold uppercase tracking-wide">You take trades without a clear plan</p></div>
+                    <div class="glass-panel p-6 border-l-4 border-red-500/50 flex items-center gap-4"><i data-lucide="x-circle" class="text-red-500"></i><p class="text-sm font-bold uppercase tracking-wide">You repeat the same mistakes again and again</p></div>
+                    <div class="glass-panel p-6 border-l-4 border-red-500/50 flex items-center gap-4"><i data-lucide="x-circle" class="text-red-500"></i><p class="text-sm font-bold uppercase tracking-wide">Emotions control your decisions</p></div>
+                    <div class="glass-panel p-6 border-l-4 border-red-500/50 flex items-center gap-4"><i data-lucide="x-circle" class="text-red-500"></i><p class="text-sm font-bold uppercase tracking-wide">You track trades… but never learn from them</p></div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="section-pad">
+        <div class="max-w-5xl mx-auto text-center">
+            <div data-aos="zoom-in">
+                <h2 class="text-4xl font-black italic mb-8 uppercase">Meet NIX – Your Trading Intelligence System</h2>
+                <p class="text-gray-400 max-w-xl mx-auto mb-16 leading-relaxed">NIX doesn't just store your trades. It studies them. It tells you what you did right, what you did wrong, and what you must stop immediately.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-[10px] font-black uppercase tracking-widest">
+                    <div class="glass-panel p-10">Analyze Performance</div>
+                    <div class="glass-panel p-10">Detect Behavioral Flaws</div>
+                    <div class="glass-panel p-10">Optimize Execution</div>
+                </div>
+                <p class="mt-12 text-blue-500 font-black italic">So you don't just trade more… You trade smarter.</p>
+            </div>
+        </div>
+    </section>
+    <section id="features" class="section-pad bg-white/[0.01]">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-center text-4xl font-black italic mb-20 uppercase">Everything You Need to Trade Like a Pro</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-panel p-8" data-aos="fade-up"><i data-lucide="brain" class="text-blue-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">AI Trade Analysis</h3><p class="text-gray-500 text-xs leading-relaxed">Get instant feedback on every trade.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="100"><i data-lucide="alert-triangle" class="text-red-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Mistake Tracker</h3><p class="text-gray-500 text-xs leading-relaxed">Identify costly habits like revenge trading.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="200"><i data-lucide="smile" class="text-emerald-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Psychology Insights</h3><p class="text-gray-500 text-xs leading-relaxed">See how your emotions impact performance.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="300"><i data-lucide="target" class="text-purple-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Setup Journal</h3><p class="text-gray-500 text-xs leading-relaxed">Track which strategies make you money.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up"><i data-lucide="bar-chart-3" class="text-orange-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Risk Analytics</h3><p class="text-gray-500 text-xs leading-relaxed">Understand your risk and drawdown.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="100"><i data-lucide="play-circle" class="text-yellow-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Replay Mode</h3><p class="text-gray-500 text-xs leading-relaxed">Revisit trades and improve decisions.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="200"><i data-lucide="bell-ring" class="text-pink-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Rule Violations</h3><p class="text-gray-500 text-xs leading-relaxed">Get warned before breaking your rules.</p></div>
+                <div class="glass-panel p-8" data-aos="fade-up" data-aos-delay="300"><i data-lucide="dna" class="text-cyan-500 mb-6"></i><h3 class="font-black text-xs uppercase mb-3 tracking-widest">Trader DNA</h3><p class="text-gray-500 text-xs leading-relaxed">Discover your trading style and edge.</p></div>
+            </div>
+        </div>
+    </section>
+    <section id="coach" class="section-pad">
+        <div class="max-w-4xl mx-auto">
+            <div class="glass-panel p-16 text-center" data-aos="zoom-in-up">
+                <div class="alpha-badge mx-auto mb-8 bg-emerald-500">A</div>
+                <h2 class="text-3xl font-black italic uppercase mb-6">Your Daily Trading Coach</h2>
+                <p class="text-gray-400 mb-12">Every day, NIX analyzes your data and tells you:</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-[11px] font-bold text-left uppercase">
+                    <div><p class="text-emerald-400 mb-2">Best Trade</p><p class="text-gray-500">Why it worked according to your edge.</p></div>
+                    <div><p class="text-red-400 mb-2">Worst Mistake</p><p class="text-gray-500">Exactly how to fix that leak.</p></div>
+                    <div><p class="text-blue-400 mb-2">Next Step</p><p class="text-gray-500">One clear action to improve tomorrow.</p></div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="section-pad bg-white/[0.01]">
+        <div class="max-w-5xl mx-auto text-center">
+            <h2 class="text-3xl font-black italic mb-16 uppercase">Traders Are Already Improving</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 italic text-sm font-light text-gray-400">
+                <div class="glass-panel p-8">"NIX helped me realize I was overtrading."</div>
+                <div class="glass-panel p-8">"I didn't need a better strategy… I needed NIX."</div>
+                <div class="glass-panel p-8">"My discipline improved more in 2 weeks than 2 years."</div>
+            </div>
+        </div>
+    </section>
+    <section class="section-pad">
+        <div class="max-w-4xl mx-auto text-center" data-aos="fade-up">
+            <h2 class="text-5xl md:text-7xl font-black italic mb-8 uppercase">Stop Guessing.<br>Start Improving.</h2>
+            <p class="text-gray-400 mb-10">If you're serious about becoming profitable, NIX is your unfair advantage.</p>
+            <div class="flex justify-center gap-6">
+                <button onclick="toggleModal('loginModal')" class="btn-blue">Join NIX Now</button>
+                <button onclick="toggleModal('loginModal')" class="btn-white">Start Free Trial</button>
+            </div>
+        </div>
+    </section>
+    <footer class="border-t border-white/5 py-20 px-6">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div><p class="font-black italic text-xl mb-4">NIX</p><p class="text-gray-500 text-xs font-bold uppercase tracking-widest">Next Intelligent Execution</p></div>
+            <div><p class="text-[10px] font-black uppercase mb-6 text-blue-500">Links</p><div class="flex flex-col gap-4 text-xs font-bold text-gray-400 uppercase"><a href="#">Home</a><a href="#">Features</a><a href="#">Pricing</a><a href="#">Contact</a></div></div>
+            <div><p class="text-[10px] font-black uppercase mb-6 text-blue-500">Socials</p><div class="flex flex-col gap-4 text-xs font-bold text-gray-400 uppercase"><a href="#">Instagram</a><a href="#">Twitter</a><a href="#">LinkedIn</a></div></div>
+            <div class="text-right text-[10px] font-bold text-gray-600 uppercase">© 2026 NIX. All rights reserved.</div>
+        </div>
+    </footer>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboardView" class="hidden-view min-h-screen flex bg-[#010413]">
+
+    <!-- SIDEBAR -->
+    <aside id="dashboardAside" class="glass-panel border-r border-white/5 p-8 flex flex-col m-4 relative">
+
+        <!-- Mini vertical logo (shown when collapsed) -->
+        <span class="sidebar-mini-logo">NIX</span>
+
+        <!-- Collapsed-state toggle (only visible when collapsed, sits at top) -->
+        <button id="sidebarToggleCollapsed" onclick="toggleSidebar()" title="Expand sidebar" style="display:none;width:28px;height:28px;background:#0f1e3d;border:1px solid rgba(59,130,246,0.4);border-radius:50%;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s;box-shadow:0 0 12px rgba(59,130,246,0.25);flex-shrink:0;margin:0 auto 16px auto;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;transform:rotate(180deg);">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+
+        <!-- Full sidebar content -->
+        <div class="sidebar-content flex flex-col flex-1" style="min-width:176px;">
+
+            <!-- TOP ROW: NIX logo + collapse toggle -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+                <div class="sidebar-logo font-black text-2xl italic tracking-tighter text-blue-500" style="margin-bottom:0;">NIX</div>
+                <button id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="flex flex-col gap-2">
+                <div id="navExecution" onclick="switchView('execution')" class="nav-link active p-4 text-left font-bold text-[11px] uppercase tracking-widest cursor-pointer">EXECUTION</div>
+                <div id="navWeekly" onclick="switchView('weekly')" class="nav-link p-4 text-left font-bold text-[11px] uppercase tracking-widest text-gray-500 hover:text-white cursor-pointer">WEEKLY STATUS</div>
+                <div id="navGoals" onclick="switchView('goals')" class="nav-link p-4 text-left font-bold text-[11px] uppercase tracking-widest text-gray-500 hover:text-white cursor-pointer">🏆 GOALS</div>
+            </nav>
+
+            <!-- EXIT SYSTEM button — right below nav -->
+            <button onclick="handleLogout()" style="margin-top:16px;padding:12px 16px;text-align:left;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#ef4444;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.14)'" onmouseout="this.style.background='rgba(239,68,68,0.06)'">EXIT SYSTEM</button>
+
+            <!-- DIVIDER -->
+            <div style="height:1px;background:rgba(255,255,255,0.05);margin:20px 0;"></div>
+
+            <!-- SESSION CLOCK -->
+            <div>
+                <p style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#334155;margin-bottom:10px;padding:0 4px;">Market Sessions (IST)</p>
+                <div id="sessionClocks" style="display:flex;flex-direction:column;gap:6px;"></div>
+                <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:4px;text-align:center;">
+                    <p style="font-size:8px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#475569;margin-bottom:3px;">IST NOW</p>
+                    <p id="istClock" style="font-size:17px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#fff;letter-spacing:1px;"></p>
+                    <p id="istDate" style="font-size:8px;font-weight:700;color:#334155;margin-top:2px;text-transform:uppercase;letter-spacing:1px;"></p>
+                </div>
+            </div>
+
+        </div>
+    </aside>
+
+    <main class="flex-1 p-10 overflow-y-auto">
+        <!-- HEADER -->
+        <header class="flex justify-between items-start mb-10">
+            <div class="flex items-center gap-4">
+                <div id="alphaAvatar" class="alpha-badge">?</div>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <input id="traderNameInput" class="editable-name" value="NIX TRADING BOOK" title="Click to edit your name" maxlength="24" spellcheck="false">
+                        <button id="saveNameBtn" onclick="saveTraderName()" title="Save name" style="display:flex;align-items:center;gap:5px;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);color:#3b82f6;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:5px 12px;border-radius:4px;cursor:pointer;transition:all 0.2s;white-space:nowrap;" onmouseover="this.style.background='rgba(59,130,246,0.25)'" onmouseout="this.style.background='rgba(59,130,246,0.12)'">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            SAVE
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3 mt-2">
+                        <p id="nameSaveStatus" class="font-bold text-[10px] uppercase" style="color:#10b981;opacity:0;transition:opacity 0.3s">✓ Saved</p>
+                        <p class="text-emerald-500 font-bold text-[10px] uppercase">Cloud Sync: Active</p>
+                        <span class="real-badge"><span class="real-dot"></span>REAL ACCOUNT</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <div class="glass-panel px-8 py-6 text-right border-blue-500/20">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase">Win Rate</p>
+                    <p id="winRateDisplay" class="text-4xl font-black text-blue-400">0%</p>
+                </div>
+                <div class="glass-panel px-8 py-6 text-right" style="border:1px solid rgba(255,255,255,0.08)">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase mb-1">Equity</p>
+                    <p class="equity-locked">$5,000.00</p>
+                    <div class="flex items-center justify-end gap-1 mt-1">
+                        <span class="lock-badge">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            FIXED
+                        </span>
+                    </div>
+                </div>
+                <div class="glass-panel px-8 py-6 text-right">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase">Net P&L</p>
+                    <p id="netPnLDisplay" class="text-4xl font-black text-white">$0.00</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- EQUITY CHART -->
+        <div class="glass-panel p-6 mb-10 chart-wrap" id="chartPanel">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-blue-500">P&L Performance</p>
+                    <p class="text-[9px] text-gray-600 uppercase font-bold mt-1">Cumulative P&L curve based on your trades</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="real-badge"><span class="real-dot"></span>REAL</span>
+                    <select id="chartFilter" onchange="renderChart()" class="!w-28 !py-2 !text-[9px] !px-3">
+                        <option value="all">All Time</option>
+                        <option value="month">This Month</option>
+                        <option value="week">This Week</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="equityChart"></canvas>
+            <div id="chartTooltip" class="chart-tooltip hidden"></div>
+        </div>
+
+        <!-- EXECUTION VIEW -->
+        <div id="executionContent" class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div class="lg:col-span-5">
+                <div class="glass-panel p-10">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-2 gap-6">
+                            <div><label>Symbol</label><select id="symbol"><option>XAUUSD</option><option>BTCUSD</option><option>EURUSD</option><option>GBPUSD</option><option>US30</option><option>NAS100</option></select></div>
+                            <div><label>Date</label><input id="date" type="date"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div><label>Status</label><select id="plStatus"><option>Profit</option><option>Loss</option><option>Breakeven</option></select></div>
+                            <div><label>Amount ($)</label><input id="amount" type="number" placeholder="0.00"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div><label>Lot Size</label><input id="lotSize" type="text" placeholder="1.00"></div>
+                            <div><label>Type</label><select id="type"><option>Long</option><option>Short</option></select></div>
+                        </div>
+                        <div>
+                            <label>Session</label>
+                            <select id="session">
+                                <option value="Asian">🌏 Asian Session</option>
+                                <option value="London">🇬🇧 London Session</option>
+                                <option value="New York">🗽 New York Session</option>
+                            </select>
+                        </div>
+                        <div><label>Rationale</label><textarea id="reason" rows="3" placeholder="Why did you take this trade?"></textarea></div>
+                        <div>
+                            <label>Trade Screenshot</label>
+                            <div class="img-upload-zone" onclick="document.getElementById('tradeImgInput').click()">
+                                <input type="file" id="tradeImgInput" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
+                                <div id="uploadPlaceholder">
+                                    <i data-lucide="image-plus" class="mx-auto mb-2 text-gray-500" style="width:28px;height:28px"></i>
+                                    <p class="text-[10px] font-black uppercase text-gray-500 tracking-widest">Click to attach chart screenshot</p>
+                                    <p class="text-[9px] text-gray-600 mt-1">PNG, JPG, WEBP supported</p>
+                                </div>
+                                <img id="imgPreview" class="img-preview-thumb hidden" alt="preview">
+                            </div>
+                            <div class="upload-progress hidden" id="uploadProgressWrap"><div class="upload-progress-bar" id="uploadProgressBar"></div></div>
+                            <p id="uploadStatus" class="text-[9px] text-gray-500 mt-2 font-bold uppercase tracking-wider"></p>
+                        </div>
+                        <button type="button" onclick="addTrade()" class="btn-white w-full">Commit Trade</button>
+                    </div>
+                </div>
+            </div>
+            <div class="lg:col-span-7"><div id="historyList" class="space-y-6"></div></div>
+        </div>
+
+        <!-- WEEKLY VIEW -->
+        <div id="weeklyContent" class="hidden-view space-y-12">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div class="lg:col-span-8">
+                    <div class="glass-panel p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xs font-black uppercase italic tracking-widest text-blue-500">Performance Heatmap</h3>
+                            <div class="flex gap-4">
+                                <select id="filterMonth" onchange="calculateWeeklyReport()" class="!w-32 !py-2 !text-[10px]">
+                                    <option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                                </select>
+                                <select id="filterYear" onchange="calculateWeeklyReport()" class="!w-24 !py-2 !text-[10px]">
+                                    <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-2 mb-2">
+                            <div class="cal-header">Sun</div><div class="cal-header">Mon</div><div class="cal-header">Tue</div><div class="cal-header">Wed</div><div class="cal-header">Thu</div><div class="cal-header">Fri</div><div class="cal-header">Sat</div>
+                        </div>
+                        <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
+                        <div class="flex gap-6 mt-6 justify-end">
+                            <div class="flex items-center gap-2 text-[9px] font-black uppercase text-emerald-400"><div style="width:12px;height:12px;border-radius:2px;background:rgba(16,185,129,0.3);border:1px solid #10b981"></div>Profit</div>
+                            <div class="flex items-center gap-2 text-[9px] font-black uppercase text-red-400"><div style="width:12px;height:12px;border-radius:2px;background:rgba(239,68,68,0.3);border:1px solid #ef4444"></div>Loss</div>
+                            <div class="flex items-center gap-2 text-[9px] font-black uppercase text-blue-400"><div style="width:12px;height:12px;border-radius:2px;background:rgba(59,130,246,0.3);border:1px solid #3b82f6"></div>Breakeven</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-4 space-y-4" id="weeklyGrid"></div>
+            </div>
+
+            <!-- MONTHLY BAR CHART -->
+            <div class="glass-panel p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <p class="text-xs font-black uppercase italic tracking-widest text-blue-500">Monthly P&L Breakdown</p>
+                        <p class="text-[9px] text-gray-600 uppercase font-bold mt-1">Daily profit / loss / breakeven bars</p>
+                    </div>
+                    <div class="flex gap-5">
+                        <div class="flex items-center gap-2 text-[9px] font-black uppercase text-emerald-400"><div style="width:10px;height:10px;border-radius:2px;background:#10b981"></div>Profit</div>
+                        <div class="flex items-center gap-2 text-[9px] font-black uppercase text-red-400"><div style="width:10px;height:10px;border-radius:2px;background:#ef4444"></div>Loss</div>
+                        <div class="flex items-center gap-2 text-[9px] font-black uppercase text-blue-400"><div style="width:10px;height:10px;border-radius:2px;background:#3b82f6"></div>Breakeven</div>
+                    </div>
+                </div>
+                <div style="position:relative;">
+                    <canvas id="monthBarChart" style="width:100%;height:240px;display:block;"></canvas>
+                    <div id="barTooltip" style="position:absolute;background:rgba(10,15,30,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:8px 12px;pointer-events:none;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;z-index:10;box-shadow:0 8px 24px rgba(0,0,0,0.5);display:none;"></div>
+                </div>
+            </div>
+
+            <!-- MONTHLY REPORT SECTION -->
+            <div class="report-panel">
+                <div class="flex items-start justify-between mb-8">
+                    <div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <div style="width:36px;height:36px;background:linear-gradient(135deg,#10b981,#059669);border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-black uppercase italic tracking-widest text-white">Monthly Report Generator</h3>
+                                <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">Export Full Month Summary as PDF</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 font-bold max-w-lg">Generate a professional PDF report of your selected month — including all trades, P&L breakdown, win rate, best/worst day, and session analysis. Download it instantly.</p>
+                    </div>
+                    <div id="reportLiveStats" class="text-right hidden">
+                        <p class="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Preview for selected month</p>
+                        <div class="flex gap-3 justify-end" id="reportStatBadges"></div>
+                    </div>
+                </div>
+
+                <div id="reportStatsRow" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"></div>
+
+                <div class="flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-1">
+                        <label style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;margin-bottom:8px;display:block;letter-spacing:1.5px;">Your Email Address (for reference only)</label>
+                        <div style="position:relative;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            <input type="email" id="reportEmail" class="report-input" placeholder="yourname@email.com" style="padding-left:42px;">
+                        </div>
+                        <p class="text-[9px] text-gray-600 font-bold mt-2 uppercase tracking-wide">* Email is printed inside the PDF. The file downloads directly to your device.</p>
+                    </div>
+                    <div class="flex flex-col gap-3 items-center">
+                        <button id="generatePdfBtn" onclick="generateMonthlyPDF()" class="pdf-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Generate & Download PDF
+                        </button>
+                        <p id="pdfStatusMsg" class="text-[9px] font-black uppercase tracking-widest" style="color:#10b981;min-height:14px;"></p>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-white/5">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-600 mb-4">What's included in the PDF report</p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:10px 12px;">
+                            <p class="text-[9px] font-black text-emerald-400 uppercase mb-1">📊 Summary Stats</p>
+                            <p class="text-[9px] text-gray-500">Total trades, win rate, net P&L, best & worst day</p>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:10px 12px;">
+                            <p class="text-[9px] font-black text-blue-400 uppercase mb-1">📋 Trade Log</p>
+                            <p class="text-[9px] text-gray-500">Every trade with symbol, date, lot, session & P&L</p>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:10px 12px;">
+                            <p class="text-[9px] font-black text-purple-400 uppercase mb-1">🕐 Session Split</p>
+                            <p class="text-[9px] text-gray-500">Performance broken down by Asian, London & NY</p>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:10px 12px;">
+                            <p class="text-[9px] font-black text-orange-400 uppercase mb-1">🏆 Symbol Stats</p>
+                            <p class="text-[9px] text-gray-500">P&L per instrument with win/loss breakdown</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GOALS & GAMIFICATION VIEW -->
+        <div id="goalsContent" class="hidden-view space-y-10">
+
+            <!-- HEADER -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-yellow-500 mb-1">🏆 Goals & Gamification</p>
+                    <h2 class="text-2xl font-black italic uppercase tracking-tight">Your Trading Progression</h2>
+                    <p class="text-[10px] text-gray-600 font-bold uppercase mt-1">Set targets · Earn badges · Track your consistency</p>
+                </div>
+                <div id="goalsTotalXP" style="background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.06));border:1px solid rgba(251,191,36,0.35);border-radius:8px;padding:14px 20px;text-align:center;">
+                    <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#92400e;margin-bottom:4px;">Total XP</p>
+                    <p id="xpDisplay" style="font-size:32px;font-weight:800;color:#fbbf24;line-height:1;">0</p>
+                    <p style="font-size:8px;font-weight:800;color:#78350f;margin-top:2px;">EXPERIENCE POINTS</p>
+                </div>
+            </div>
+
+            <!-- MONTHLY PROFIT TARGET -->
+            <div style="background:linear-gradient(135deg,rgba(59,130,246,0.07),rgba(16,185,129,0.04));border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:28px 32px;">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <p style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#3b82f6;margin-bottom:4px;">🎯 Monthly Profit Target</p>
+                        <p style="font-size:12px;font-weight:800;color:#94a3b8;">Set your goal and watch the bar fill up</p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <select id="goalMonth" onchange="renderGoalsView()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:8px 14px;font-size:10px;font-weight:800;outline:none;width:auto;">
+                            <option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                        </select>
+                        <select id="goalYear" onchange="renderGoalsView()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:8px 14px;font-size:10px;font-weight:800;outline:none;width:auto;">
+                            <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Target setter -->
+                    <div>
+                        <label style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:8px;display:block;">Set Monthly Target ($)</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" id="monthlyTargetInput" placeholder="e.g. 500" min="0" style="background:rgba(255,255,255,0.06);border:1px solid rgba(59,130,246,0.4);color:#fff;border-radius:5px;padding:12px 16px;font-size:18px;font-weight:800;outline:none;width:180px;">
+                            <button onclick="saveMonthlyTarget()" style="background:#3b82f6;color:#fff;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:1px;padding:12px 18px;border-radius:5px;border:none;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">SET GOAL</button>
+                        </div>
+                        <p style="font-size:9px;color:#334155;font-weight:700;margin-top:6px;text-transform:uppercase;letter-spacing:1px;">Saved per month — changes when you pick a different month</p>
+                    </div>
+                    <!-- Progress display -->
+                    <div id="targetProgressPanel">
+                        <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:10px;">Progress This Month</p>
+                        <div id="targetProgressContent">
+                            <p style="font-size:11px;font-weight:800;color:#334155;font-style:italic;">Set a target to see your progress →</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BADGES / ACHIEVEMENTS -->
+            <div>
+                <p style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#fbbf24;margin-bottom:16px;">🎖️ Achievements</p>
+                <div id="badgesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+            </div>
+
+            <!-- STREAK / CONSISTENCY HEATMAP -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:28px 32px;">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <p style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#a78bfa;margin-bottom:4px;">📅 Consistency Heatmap</p>
+                        <p style="font-size:11px;font-weight:800;color:#94a3b8;">Your trading activity over the year — GitHub style</p>
+                    </div>
+                    <select id="heatmapYear" onchange="renderGoalsView()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:4px;padding:8px 14px;font-size:10px;font-weight:800;outline:none;width:auto;">
+                        <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+                    </select>
+                </div>
+                <!-- Month labels -->
+                <div id="heatmapMonthLabels" style="display:flex;gap:0;margin-bottom:4px;padding-left:28px;"></div>
+                <div style="display:flex;gap:6px;">
+                    <!-- Day labels -->
+                    <div style="display:flex;flex-direction:column;gap:3px;padding-top:2px;">
+                        <div style="height:13px;font-size:8px;font-weight:800;color:#334155;"></div>
+                        <div style="height:13px;font-size:8px;font-weight:800;color:#475569;line-height:13px;">Mon</div>
+                        <div style="height:13px;"></div>
+                        <div style="height:13px;font-size:8px;font-weight:800;color:#475569;line-height:13px;">Wed</div>
+                        <div style="height:13px;"></div>
+                        <div style="height:13px;font-size:8px;font-weight:800;color:#475569;line-height:13px;">Fri</div>
+                        <div style="height:13px;"></div>
+                    </div>
+                    <div id="heatmapGrid" style="display:flex;gap:3px;overflow-x:auto;flex:1;"></div>
+                </div>
+                <!-- Legend -->
+                <div style="display:flex;align-items:center;gap:6px;margin-top:14px;justify-content:flex-end;">
+                    <p style="font-size:8px;font-weight:800;color:#334155;text-transform:uppercase;">Less</p>
+                    <div style="width:12px;height:12px;border-radius:2px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);"></div>
+                    <div style="width:12px;height:12px;border-radius:2px;background:rgba(167,139,250,0.25);"></div>
+                    <div style="width:12px;height:12px;border-radius:2px;background:rgba(167,139,250,0.5);"></div>
+                    <div style="width:12px;height:12px;border-radius:2px;background:rgba(167,139,250,0.75);"></div>
+                    <div style="width:12px;height:12px;border-radius:2px;background:#a78bfa;"></div>
+                    <p style="font-size:8px;font-weight:800;color:#334155;text-transform:uppercase;">More</p>
+                </div>
+                <!-- Streak stats -->
+                <div id="streakStats" class="grid grid-cols-3 gap-4 mt-6"></div>
+            </div>
+
+        </div>
+
+    </main>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="loginModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-6 backdrop-blur-md">
+    <div class="glass-panel max-w-sm w-full overflow-hidden relative">
+        <button onclick="toggleModal('loginModal')" class="absolute top-4 right-4 text-gray-500">✕</button>
+        <div class="flex border-b border-white/5">
+            <button id="tabL" onclick="switchAuth('login')" class="flex-1 py-5 text-[10px] font-black uppercase border-b-2 border-white tracking-widest">Login</button>
+            <button id="tabR" onclick="switchAuth('reg')" class="flex-1 py-5 text-[10px] font-black uppercase border-b-2 border-transparent text-gray-500 tracking-widest">Register</button>
+        </div>
+        <div class="p-10">
+            <form id="lForm" onsubmit="handleLogin(event)" class="space-y-6">
+                <div><label>Email</label><input type="email" id="lEmail" required></div>
+                <div><label>Passkey</label><input type="password" id="lPass" required></div>
+                <button type="submit" class="btn-white w-full">Access Terminal</button>
+            </form>
+            <form id="rForm" onsubmit="handleRegister(event)" class="space-y-6 hidden">
+                <div><label>Operator Name</label><input type="text" id="rName" required></div>
+                <div><label>Terminal Email</label><input type="email" id="rEmail" required></div>
+                <div><label>Secure Passkey</label><input type="password" id="rPass" required></div>
+                <button type="submit" class="btn-blue w-full">Initialize Operator</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" class="hidden-view" style="position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
+    <div id="lightboxClose" onclick="closeLightbox()" style="position:absolute;top:20px;right:20px;color:#fff;font-size:28px;cursor:pointer;background:rgba(255,255,255,0.1);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">✕</div>
+    <img id="lightboxImg" src="" alt="Trade screenshot" style="max-width:90vw;max-height:90vh;border-radius:6px;border:1px solid rgba(255,255,255,0.1)">
+</div>
+
+<!-- EDIT TRADE MODAL -->
+<div id="editModal" class="hidden-view" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);padding:24px;">
+    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.1);border-radius:8px;width:100%;max-width:520px;overflow:hidden;">
+        <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-between;align-items:center;background:rgba(59,130,246,0.06);">
+            <div>
+                <p style="font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:2px;color:#3b82f6;">✎ Edit Trade</p>
+                <p id="editModalId" style="font-size:9px;color:#475569;font-weight:700;margin-top:2px;letter-spacing:1px;text-transform:uppercase;"></p>
+            </div>
+            <button onclick="closeEditModal()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:#fff;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+        <div style="padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div><label>Symbol</label><select id="editSymbol"><option>XAUUSD</option><option>BTCUSD</option><option>EURUSD</option><option>GBPUSD</option><option>US30</option><option>NAS100</option></select></div>
+            <div><label>Date</label><input id="editDate" type="date"></div>
+            <div><label>Status</label><select id="editPlStatus"><option>Profit</option><option>Loss</option><option>Breakeven</option></select></div>
+            <div><label>Amount ($)</label><input id="editAmount" type="number" placeholder="0.00"></div>
+            <div><label>Lot Size</label><input id="editLotSize" type="text" placeholder="1.00"></div>
+            <div><label>Type</label><select id="editType"><option>Long</option><option>Short</option></select></div>
+            <div style="grid-column:1/-1;"><label>Session</label><select id="editSession"><option value="Asian">🌏 Asian Session</option><option value="London">🇬🇧 London Session</option><option value="New York">🗽 New York Session</option></select></div>
+            <div style="grid-column:1/-1;"><label>Rationale</label><textarea id="editReason" rows="3" placeholder="Why did you take this trade?"></textarea></div>
+        </div>
+        <div style="padding:0 24px 24px;display:flex;gap:10px;">
+            <button onclick="saveEditTrade()" class="btn-blue" style="flex:1;font-size:11px;">✓ Update Trade</button>
+            <button onclick="closeEditModal()" style="flex:0 0 auto;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#64748b;font-weight:800;padding:1rem 1.5rem;border-radius:4px;text-transform:uppercase;font-size:11px;cursor:pointer;">Cancel</button>
+        </div>
+        <p id="editSaveStatus" style="text-align:center;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#10b981;padding-bottom:16px;opacity:0;transition:opacity 0.3s;">✓ Trade updated successfully</p>
+    </div>
+</div>
+
+<!-- DAY DETAIL MODAL -->
+<div id="dayModal" class="hidden-view" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);padding:24px;">
+    <div id="dayModalBox" style="background:#0b1120;border:1px solid rgba(255,255,255,0.1);border-radius:8px;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;">
+        <div style="padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#0b1120;z-index:10">
+            <div>
+                <p id="dayModalTitle" class="font-black text-lg uppercase italic tracking-tight"></p>
+                <p id="dayModalSub" style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-top:5px;display:flex;align-items:center;flex-wrap:wrap;gap:2px;"></p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <p id="dayModalPnL" class="text-2xl font-black"></p>
+                <button onclick="closeDayModal()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:#fff;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+            </div>
+        </div>
+        <div id="dayModalBody" style="padding:20px 28px"></div>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = { apiKey: "AIzaSyBEztvUeHF2do0coPcKna_F3R4AaoiKRCA", authDomain: "nix-journal.firebaseapp.com", projectId: "nix-journal", storageBucket: "nix-journal.firebasestorage.app", messagingSenderId: "478114595791", appId: "1:478114595791:web:766a04781531516a3b08ba" };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore(), auth = firebase.auth(), storage = firebase.storage();
+let globalTrades = [], pendingImgFile = null;
+
+function toggleSidebar() {
+    const aside = document.getElementById('dashboardAside');
+    aside.classList.toggle('collapsed');
+    const isCollapsed = aside.classList.contains('collapsed');
+    const collapsedBtn = document.getElementById('sidebarToggleCollapsed');
+    collapsedBtn.style.display = isCollapsed ? 'flex' : 'none';
+    setTimeout(renderChart, 320);
+}
+
+function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
+function switchAuth(t) {
+    document.getElementById('lForm').classList.toggle('hidden', t==='reg');
+    document.getElementById('rForm').classList.toggle('hidden', t==='login');
+    document.getElementById('tabL').classList.toggle('border-white', t==='login');
+    document.getElementById('tabL').classList.toggle('text-gray-500', t==='reg');
+    document.getElementById('tabR').classList.toggle('border-white', t==='reg');
+    document.getElementById('tabR').classList.toggle('text-gray-500', t==='login');
+}
+
+function openLightbox(url) {
+    document.getElementById('lightboxImg').src = url;
+    document.getElementById('lightbox').classList.remove('hidden-view');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.add('hidden-view');
+    document.getElementById('lightboxImg').src = '';
+}
+
+auth.onAuthStateChanged(async u => {
+    if (u) {
+        const doc = await db.collection("users").doc(u.uid).get();
+        enterDashboard(doc.exists ? doc.data().name : "O");
+    } else {
+        document.getElementById('landingView').classList.remove('hidden-view');
+        document.getElementById('dashboardView').classList.add('hidden-view');
+    }
+});
+async function handleLogin(e) { e.preventDefault(); try { await auth.signInWithEmailAndPassword(document.getElementById('lEmail').value, document.getElementById('lPass').value); } catch(err){alert(err.message);} }
+async function handleRegister(e) { e.preventDefault(); try { const c = await auth.createUserWithEmailAndPassword(document.getElementById('rEmail').value, document.getElementById('rPass').value); await db.collection("users").doc(c.user.uid).set({name:document.getElementById('rName').value,email:document.getElementById('rEmail').value}); } catch(err){alert(err.message);} }
+function handleLogout() { if(confirm("Exit NIX?")) auth.signOut(); }
+
+async function saveTraderName() {
+    const u = auth.currentUser; if (!u) return;
+    const name = document.getElementById('traderNameInput').value.trim();
+    if (!name) return;
+    const btn = document.getElementById('saveNameBtn');
+    const status = document.getElementById('nameSaveStatus');
+    btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
+    try {
+        await db.collection("users").doc(u.uid).set({ name: name }, { merge: true });
+        document.getElementById('alphaAvatar').innerText = name.charAt(0).toUpperCase();
+        status.style.opacity = '1';
+        setTimeout(() => { status.style.opacity = '0'; }, 2200);
+    } catch(e) { alert('Save failed: ' + e.message); }
+    btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
+}
+
+function enterDashboard(name) {
+    document.getElementById('landingView').classList.add('hidden-view');
+    document.getElementById('loginModal').classList.add('hidden');
+    document.getElementById('dashboardView').classList.remove('hidden-view');
+    const avatar = document.getElementById('alphaAvatar');
+    avatar.innerText = name.charAt(0).toUpperCase();
+    document.getElementById('traderNameInput').value = name.toUpperCase();
+    document.getElementById('date').valueAsDate = new Date();
+    const d = new Date();
+    document.getElementById('filterMonth').value = String(d.getMonth()+1).padStart(2,'0');
+    document.getElementById('filterYear').value = String(d.getFullYear());
+    const nameInput = document.getElementById('traderNameInput');
+    nameInput.addEventListener('input', () => { const v = nameInput.value.trim(); avatar.innerText = v.charAt(0).toUpperCase() || '?'; });
+    nameInput.addEventListener('keydown', e => { if(e.key==='Enter') { nameInput.blur(); saveTraderName(); } });
+    // Init goals selects
+    document.getElementById('goalMonth').value = String(d.getMonth()+1).padStart(2,'0');
+    document.getElementById('goalYear').value = String(d.getFullYear());
+    document.getElementById('heatmapYear').value = String(d.getFullYear());
+    startRealtimeSync();
+}
+
+function switchView(v) {
+    document.getElementById('executionContent').classList.toggle('hidden-view', v!=='execution');
+    document.getElementById('weeklyContent').classList.toggle('hidden-view', v!=='weekly');
+    document.getElementById('goalsContent').classList.toggle('hidden-view', v!=='goals');
+    ['navExecution','navWeekly','navGoals'].forEach(id => {
+        document.getElementById(id).classList.remove('active');
+        document.getElementById(id).classList.add('text-gray-500');
+    });
+    const activeMap = {execution:'navExecution', weekly:'navWeekly', goals:'navGoals'};
+    document.getElementById(activeMap[v]).classList.add('active');
+    document.getElementById(activeMap[v]).classList.remove('text-gray-500');
+    if (v==='weekly') calculateWeeklyReport();
+    if (v==='goals') renderGoalsView();
+}
+
+function handleImgSelect(e) {
+    const file = e.target.files[0]; if (!file) return;
+    pendingImgFile = file;
+    const r = new FileReader();
+    r.onload = ev => {
+        document.getElementById('uploadPlaceholder').classList.add('hidden');
+        const p = document.getElementById('imgPreview'); p.src = ev.target.result; p.classList.remove('hidden');
+        document.getElementById('uploadStatus').innerText = `📎 ${file.name} ready`;
+    };
+    r.readAsDataURL(file);
+}
+async function uploadTradeImage() {
+    if (!pendingImgFile) return null;
+    return new Promise((res, rej) => {
+        const reader = new FileReader();
+        const prog = document.getElementById('uploadProgressBar');
+        const wrap = document.getElementById('uploadProgressWrap');
+        wrap.classList.remove('hidden');
+        let pct = 0;
+        const tick = setInterval(() => { pct = Math.min(pct + 15, 90); prog.style.width = pct + '%'; }, 80);
+        reader.onload = e => {
+            clearInterval(tick); prog.style.width = '100%';
+            setTimeout(() => { wrap.classList.add('hidden'); prog.style.width = '0%'; }, 400);
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 800; let w = img.width, h = img.height;
+                if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                res(canvas.toDataURL('image/jpeg', 0.72));
+            };
+            img.onerror = rej; img.src = e.target.result;
+        };
+        reader.onerror = rej; reader.readAsDataURL(pendingImgFile);
+    });
+}
+function resetImageUpload() {
+    pendingImgFile = null;
+    document.getElementById('tradeImgInput').value = '';
+    document.getElementById('imgPreview').classList.add('hidden');
+    document.getElementById('imgPreview').src = '';
+    document.getElementById('uploadPlaceholder').classList.remove('hidden');
+    document.getElementById('uploadStatus').innerText = '';
+    document.getElementById('uploadProgressBar').style.width = '0%';
+}
+
+async function addTrade() {
+    const u = auth.currentUser; if (!u) return;
+    const statusEl = document.getElementById('uploadStatus');
+    statusEl.innerText = 'Saving…';
+    const tempId = db.collection("trades").doc().id;
+    let imgURL = null;
+    if (pendingImgFile) { statusEl.innerText = 'Processing screenshot…'; try { imgURL = await uploadTradeImage(); } catch(e){ alert('Image processing failed: '+e.message); statusEl.innerText=''; return; } }
+    await db.collection("trades").doc(tempId).set({ userId:u.uid, symbol:document.getElementById('symbol').value, date:document.getElementById('date').value, plStatus:document.getElementById('plStatus').value, amount:parseFloat(document.getElementById('amount').value||"0"), lotSize:document.getElementById('lotSize').value||"1.00", type:document.getElementById('type').value, session:document.getElementById('session').value||"Asian", reason:document.getElementById('reason').value||"N/A", imgURL:imgURL||null, timestamp:firebase.firestore.FieldValue.serverTimestamp() });
+    ['symbol','lotSize','amount','reason'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('date').valueAsDate = new Date();
+    resetImageUpload(); statusEl.innerText='✓ Trade committed'; setTimeout(()=>statusEl.innerText='',3000);
+}
+async function deleteTrade(id) { if(confirm("Permanently delete?")) await db.collection("trades").doc(id).delete(); }
+
+function openEditModal(id) {
+    const t = globalTrades.find(x => x.id === id); if (!t) return;
+    document.getElementById('editModal').dataset.editId = id;
+    document.getElementById('editModalId').innerText = `ID: ${id.slice(0,12)}…`;
+    document.getElementById('editSymbol').value   = t.symbol   || 'XAUUSD';
+    document.getElementById('editDate').value     = t.date     || '';
+    document.getElementById('editPlStatus').value = t.plStatus || 'Profit';
+    document.getElementById('editAmount').value   = t.amount   || 0;
+    document.getElementById('editLotSize').value  = t.lotSize  || '1.00';
+    document.getElementById('editType').value     = t.type     || 'Long';
+    document.getElementById('editSession').value  = t.session  || 'Asian';
+    document.getElementById('editReason').value   = t.reason === 'N/A' ? '' : (t.reason || '');
+    document.getElementById('editSaveStatus').style.opacity = '0';
+    document.getElementById('editModal').classList.remove('hidden-view');
+    document.body.style.overflow = 'hidden';
+}
+function closeEditModal() { document.getElementById('editModal').classList.add('hidden-view'); document.body.style.overflow = ''; }
+async function saveEditTrade() {
+    const id = document.getElementById('editModal').dataset.editId; if (!id) return;
+    const btn = document.querySelector('#editModal .btn-blue');
+    btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; btn.innerText = 'Saving…';
+    try {
+        await db.collection("trades").doc(id).update({ symbol:document.getElementById('editSymbol').value, date:document.getElementById('editDate').value, plStatus:document.getElementById('editPlStatus').value, amount:parseFloat(document.getElementById('editAmount').value||'0'), lotSize:document.getElementById('editLotSize').value||'1.00', type:document.getElementById('editType').value, session:document.getElementById('editSession').value, reason:document.getElementById('editReason').value||'N/A' });
+        const st = document.getElementById('editSaveStatus'); st.style.opacity = '1';
+        setTimeout(() => { st.style.opacity = '0'; closeEditModal(); }, 1400);
+    } catch(e) { alert('Update failed: ' + e.message); }
+    btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; btn.innerText = '✓ Update Trade';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('editModal').addEventListener('click', e => { if (e.target === document.getElementById('editModal')) closeEditModal(); });
+    document.getElementById('dayModal').addEventListener('click', e => { if(e.target===document.getElementById('dayModal')) closeDayModal(); });
+});
+
+function openDayModal(dateStr, dayTrades) {
+    const total = dayTrades.reduce((s,t)=>s+(t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0),0);
+    const wins=dayTrades.filter(t=>t.plStatus==='Profit').length, losses=dayTrades.filter(t=>t.plStatus==='Loss').length, bes=dayTrades.filter(t=>t.plStatus==='Breakeven').length;
+    const d = new Date(dateStr+'T00:00:00');
+    document.getElementById('dayModalTitle').innerText = d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    let statParts = [`${dayTrades.length} TRADE${dayTrades.length!==1?'S':''}`];
+    statParts.push(`<span style="color:#34d399">✓ ${wins} WIN${wins!==1?'S':''}</span>`);
+    statParts.push(`<span style="color:#f87171">✗ ${losses} LOSS${losses!==1?'ES':''}</span>`);
+    if (bes > 0) statParts.push(`<span style="color:#60a5fa">~ ${bes} BE</span>`);
+    document.getElementById('dayModalSub').innerHTML = statParts.join('<span style="color:#334155"> &nbsp;•&nbsp; </span>');
+    const pnlEl = document.getElementById('dayModalPnL');
+    pnlEl.innerText = `${total>=0?'+':'-'}${Math.abs(total).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    pnlEl.style.color = total>0?'#34d399':total<0?'#f87171':'#60a5fa';
+    const body = document.getElementById('dayModalBody'); body.innerHTML = '';
+    dayTrades.forEach(t => {
+        const isProfit=t.plStatus==='Profit', isLoss=t.plStatus==='Loss';
+        const col=isProfit?'#34d399':isLoss?'#f87171':'#60a5fa';
+        const sign=isProfit?'+':isLoss?'-':'±';
+        const borderCol=isProfit?'rgba(16,185,129,0.35)':isLoss?'rgba(239,68,68,0.35)':'rgba(59,130,246,0.35)';
+        const card=document.createElement('div'); card.className='day-trade-card'; card.style.borderLeft=`3px solid ${borderCol}`;
+        card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><p style="font-weight:800;font-size:16px;margin-bottom:2px">${t.symbol}</p><div style="display:flex;gap:8px;margin-top:4px"><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:3px">${t.type}</span><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:3px">${t.lotSize} LOT</span><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:3px;background:${borderCol};color:${col}">${t.plStatus}</span><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:3px;border:1px solid rgba(255,255,255,0.08)">${t.session==='London'?'🇬🇧':t.session==='New York'?'🗽':'🌏'} ${t.session||'Asian'}</span></div></div><p style="font-size:22px;font-weight:800;color:${col}">${sign}${t.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</p></div><p style="font-size:11px;color:#94a3b8;font-style:italic;background:rgba(255,255,255,0.03);padding:10px 12px;border-radius:4px;margin-bottom:${t.imgURL?'12px':'0'}">"${t.reason}"</p>${t.imgURL?`<img src="${t.imgURL}" style="width:100%;border-radius:5px;border:1px solid rgba(255,255,255,0.08);cursor:pointer;max-height:220px;object-fit:cover" onclick="closeDayModal();openLightbox('${t.imgURL.replace(/'/g,"\\'")}');" title="Click to enlarge">`:''}`;
+        body.appendChild(card);
+    });
+    document.getElementById('dayModal').classList.remove('hidden-view');
+    document.body.style.overflow = 'hidden';
+}
+function closeDayModal() { document.getElementById('dayModal').classList.add('hidden-view'); document.body.style.overflow = ''; }
+
+function buildChartData(filter) {
+    const now = new Date();
+    let sorted = [...globalTrades].sort((a,b)=>a.date.localeCompare(b.date));
+    if (filter==='month') { const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; sorted=sorted.filter(t=>t.date.startsWith(ym)); }
+    else if (filter==='week') { const wAgo=new Date(now-7*864e5).toISOString().slice(0,10); sorted=sorted.filter(t=>t.date>=wAgo); }
+    const pts=[], labels=[]; let running=0; const byDate={};
+    sorted.forEach(t=>{ byDate[t.date]=(byDate[t.date]||0)+(t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0); });
+    const entries=Object.entries(byDate).sort(([a],[b])=>a.localeCompare(b));
+    pts.push(0); labels.push('Start');
+    entries.forEach(([date,val])=>{ running+=val; pts.push(running); labels.push(date); });
+    return {pts,labels};
+}
+
+function renderChart() {
+    const canvas=document.getElementById('equityChart');
+    const filter=document.getElementById('chartFilter').value;
+    const {pts,labels}=buildChartData(filter);
+    const dpr=window.devicePixelRatio||1;
+    const W=canvas.offsetWidth, H=220;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    const ctx=canvas.getContext('2d');
+    ctx.scale(dpr,dpr);
+    if (pts.length<2) { ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.font='800 11px Plus Jakarta Sans'; ctx.textAlign='center'; ctx.fillText('NO TRADE DATA FOR THIS PERIOD',W/2,H/2); return; }
+    const pad={t:20,r:20,b:30,l:60};
+    const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+    const minV=Math.min(...pts), maxV=Math.max(...pts);
+    const range=maxV-minV||1;
+    const toX=i=>(pad.l + (i/(pts.length-1))*cW);
+    const toY=v=>(pad.t + cH - ((v-minV)/range)*cH);
+    ctx.clearRect(0,0,W,H);
+    const grad=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+    const isPos=(pts[pts.length-1]||0)>=0;
+    const lineCol=isPos?'#a3e635':'#f87171';
+    grad.addColorStop(0, isPos?'rgba(163,230,53,0.25)':'rgba(248,113,113,0.25)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    function smoothPath(points) {
+        ctx.beginPath(); ctx.moveTo(toX(0),toY(points[0]));
+        for (let i=1;i<points.length;i++) { const x0=toX(i-1),y0=toY(points[i-1]),x1=toX(i),y1=toY(points[i]); const cpx=(x0+x1)/2; ctx.bezierCurveTo(cpx,y0,cpx,y1,x1,y1); }
+    }
+    smoothPath(pts);
+    ctx.lineTo(toX(pts.length-1),H-pad.b); ctx.lineTo(toX(0),H-pad.b); ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+    smoothPath(pts);
+    ctx.strokeStyle=lineCol; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+    const ticks=4;
+    ctx.fillStyle='rgba(100,116,139,0.9)'; ctx.font='700 9px Plus Jakarta Sans'; ctx.textAlign='right';
+    for (let i=0;i<=ticks;i++) { const v=minV+(range/ticks)*i; const y=toY(v); ctx.fillText('$'+v.toFixed(0),pad.l-6,y+3); ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke(); }
+    ctx.fillStyle='rgba(100,116,139,0.9)'; ctx.textAlign='center';
+    const step=Math.ceil(labels.length/6);
+    labels.forEach((lbl,i)=>{ if(i%step===0&&i>0) ctx.fillText(lbl.slice(5),toX(i),H-pad.b+14); });
+    const lx=toX(pts.length-1), ly=toY(pts[pts.length-1]);
+    const glow=ctx.createRadialGradient(lx,ly,0,lx,ly,10);
+    glow.addColorStop(0,isPos?'rgba(163,230,53,0.6)':'rgba(248,113,113,0.6)'); glow.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(lx,ly,10,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+    ctx.beginPath(); ctx.arc(lx,ly,3,0,Math.PI*2); ctx.fillStyle=lineCol; ctx.fill();
+    canvas.onmousemove = (e) => {
+        const rect=canvas.getBoundingClientRect(); const mx=e.clientX-rect.left-pad.l;
+        const idx=Math.max(0,Math.min(pts.length-1,Math.round((mx/cW)*(pts.length-1))));
+        const tip=document.getElementById('chartTooltip');
+        const val=pts[idx]; const lbl=labels[idx]; const col=val>=0?'#a3e635':'#f87171';
+        tip.innerHTML=`<span style="color:${col};font-size:13px">$${val.toFixed(2)}</span><br><span style="color:#64748b;font-size:9px;font-weight:700">${lbl}</span>`;
+        tip.style.left=(toX(idx)+10)+'px'; tip.style.top=(toY(val)-36)+'px'; tip.classList.remove('hidden');
+        ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+        ctx.beginPath(); ctx.moveTo(toX(idx),pad.t); ctx.lineTo(toX(idx),H-pad.b); ctx.stroke(); ctx.restore();
+    };
+    canvas.onmouseleave = () => document.getElementById('chartTooltip').classList.add('hidden');
+}
+
+function updateStats() {
+    let tp=0, w=0, l=0;
+    globalTrades.forEach(t => { if(t.plStatus==='Profit'){tp+=t.amount;w++;} else if(t.plStatus==='Loss'){tp-=t.amount;l++;} });
+    const wr=(w+l)>0?Math.round((w/(w+l))*100):0;
+    document.getElementById('winRateDisplay').innerText=`${wr}%`;
+    document.getElementById('netPnLDisplay').innerText=`${tp>=0?'+':'-'}$${Math.abs(tp).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    document.getElementById('netPnLDisplay').className=`text-4xl font-black ${tp>0?'text-emerald-400':tp<0?'text-red-400':'text-white'}`;
+}
+
+function startRealtimeSync() {
+    db.collection("trades").where("userId","==",auth.currentUser.uid).onSnapshot(snap => {
+        const list=document.getElementById('historyList'); list.innerHTML="";
+        let tp=0,w=0,l=0; globalTrades=[];
+        snap.forEach(doc=>globalTrades.push({id:doc.id,...doc.data()}));
+        globalTrades.sort((a,b)=>b.date.localeCompare(a.date));
+        globalTrades.forEach(t=>{
+            let c='text-blue-400',sign='±';
+            if(t.plStatus==='Profit'){c='text-emerald-400';sign='+';tp+=t.amount;w++;}
+            else if(t.plStatus==='Loss'){c='text-red-400';sign='-';tp-=t.amount;l++;}
+            const imgHTML=t.imgURL?`<img src="${t.imgURL}" class="trade-img" alt="Trade chart" onclick="openLightbox('${t.imgURL}')" title="Click to enlarge">`:'';
+            const card=document.createElement('div'); card.className="glass-panel p-8 relative overflow-hidden mb-5";
+            const sessionEmoji=t.session==='London'?'🇬🇧':t.session==='New York'?'🗽':'🌏';
+            const sessionLabel=t.session||'Asian';
+            card.innerHTML=`<div style="position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:50"><div onclick="openEditModal('${t.id}')" title="Edit trade" style="background:rgba(59,130,246,0.15);color:#3b82f6;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(59,130,246,0.3);font-size:11px;">✎</div><div onclick="deleteTrade('${t.id}')" title="Delete trade" style="background:rgba(239,68,68,0.15);color:#ef4444;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(239,68,68,0.3);font-size:12px;">✕</div></div><div class="flex justify-between items-center pr-16"><div><p class="font-black text-xl">${t.symbol}</p><p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${t.date}</p><span style="display:inline-block;margin-top:5px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:3px;border:1px solid rgba(255,255,255,0.08)">${sessionEmoji} ${sessionLabel}</span></div><div class="text-right"><p class="text-2xl font-black ${c}">${sign}$${t.amount.toLocaleString()}</p><p class="text-[10px] text-gray-500 uppercase font-bold">${t.type} • ${t.lotSize} LOT</p></div></div><div class="mt-4 p-4 bg-white/5 rounded-md text-xs italic text-gray-400">"${t.reason}"</div>${imgHTML}`;
+            list.appendChild(card);
+        });
+        const wr=(w+l)>0?Math.round((w/(w+l))*100):0;
+        document.getElementById('winRateDisplay').innerText=`${wr}%`;
+        const netPnL=tp;
+        document.getElementById('netPnLDisplay').innerText=`${netPnL>=0?'+':'-'}$${Math.abs(netPnL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+        document.getElementById('netPnLDisplay').className=`text-4xl font-black ${netPnL>0?'text-emerald-400':netPnL<0?'text-red-400':'text-white'}`;
+        setTimeout(renderChart,50);
+        if (!document.getElementById('weeklyContent').classList.contains('hidden-view')) calculateWeeklyReport();
+        if (!document.getElementById('goalsContent').classList.contains('hidden-view')) renderGoalsView();
+        lucide.createIcons();
+    });
+}
+
+function calculateWeeklyReport() {
+    const m=document.getElementById('filterMonth').value, y=document.getElementById('filterYear').value;
+    const calGrid=document.getElementById('calendarGrid'), weekGrid=document.getElementById('weeklyGrid');
+    calGrid.innerHTML=""; weekGrid.innerHTML="";
+    const dailyPnL={}, tradedDays=new Set();
+    globalTrades.forEach(t=>{ const [tY,tM,tD]=t.date.split('-'); if(tY===y&&tM===m){ const val=t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0; dailyPnL[tD]=(dailyPnL[tD]||0)+val; tradedDays.add(tD); } });
+    const daysInMonth=new Date(parseInt(y),parseInt(m),0).getDate();
+    const firstDow=new Date(parseInt(y),parseInt(m)-1,1).getDay();
+    for(let i=0;i<firstDow;i++){const e=document.createElement('div');e.className="cal-day cal-empty";calGrid.appendChild(e);}
+    for(let d=1;d<=daysInMonth;d++){
+        const ds=String(d).padStart(2,'0'); const p=dailyPnL[ds]||0;
+        let cls="cal-day glass-panel";
+        if(tradedDays.has(ds)){cls+=p>0?" cal-profit":p<0?" cal-loss":" cal-breakeven";}
+        const div=document.createElement('div'); div.className=cls;
+        div.title=tradedDays.has(ds)?`${d}: ${p>=0?'+':''}${p.toFixed(2)} — click to view trades`:'';
+        div.innerHTML=`<span>${d}</span>${tradedDays.has(ds)&&p!==0?`<span style="font-size:7px;margin-top:2px;opacity:0.7">${Math.abs(p).toLocaleString()}</span>`:''}`;
+        if (tradedDays.has(ds)) {
+            div.classList.add('has-trades');
+            const fullDate=`${y}-${m}-${ds}`;
+            div.onclick=()=>{ const dayTrades=globalTrades.filter(t=>t.date===fullDate); openDayModal(fullDate,dayTrades); };
+        }
+        calGrid.appendChild(div);
+    }
+    const weekStats=[{p:0,c:0},{p:0,c:0},{p:0,c:0},{p:0,c:0},{p:0,c:0}];
+    Object.entries(dailyPnL).forEach(([ds,val])=>{ const wIdx=Math.min(Math.floor((parseInt(ds)+firstDow-1)/7),4); weekStats[wIdx].p+=val; weekStats[wIdx].c++; });
+    weekStats.forEach((s,i)=>{ if(!s.c)return; const col=s.p>0?'text-emerald-400':s.p<0?'text-red-400':'text-blue-400'; const card=document.createElement('div'); card.className="glass-panel p-6 flex justify-between items-center"; card.innerHTML=`<div><p class="text-[8px] font-black text-gray-500 uppercase">Week 0${i+1}</p><p class="text-[9px] text-gray-600">${s.c} trade${s.c!==1?'s':''}</p></div><p class="text-xl font-black ${col}">${s.p<0?'-':'+'}$${Math.abs(s.p).toLocaleString()}</p>`; weekGrid.appendChild(card); });
+
+    // ── MONTHLY SUMMARY CARD ──────────────────────────────────────────
+    const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthTrades = globalTrades.filter(t => { const [tY,tM]=t.date.split('-'); return tY===y && tM===m; });
+    let monthNet=0, mWins=0, mLosses=0, mBe=0;
+    monthTrades.forEach(t => {
+        const v = t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0;
+        monthNet += v;
+        if(t.plStatus==='Profit') mWins++;
+        else if(t.plStatus==='Loss') mLosses++;
+        else mBe++;
+    });
+    const mTotal = mWins+mLosses+mBe;
+    const mWR = mTotal>0 ? Math.round((mWins/mTotal)*100) : 0;
+    const mColor = monthNet>0?'#10b981':monthNet<0?'#ef4444':'#3b82f6';
+    const mBorderColor = monthNet>0?'rgba(16,185,129,0.35)':monthNet<0?'rgba(239,68,68,0.35)':'rgba(59,130,246,0.35)';
+    const mGlow = monthNet>0?'rgba(16,185,129,0.08)':monthNet<0?'rgba(239,68,68,0.08)':'rgba(59,130,246,0.08)';
+    const mSign = monthNet>=0?'+':'-';
+    const mLabel = monthNet>0?'PROFITABLE MONTH':monthNet<0?'LOSING MONTH':'BREAKEVEN MONTH';
+    const mIcon = monthNet>0?'▲':monthNet<0?'▼':'~';
+
+    if (mTotal > 0) {
+        // separator
+        const sep = document.createElement('div');
+        sep.style.cssText = 'height:1px;background:rgba(255,255,255,0.06);margin:4px 0;';
+        weekGrid.appendChild(sep);
+
+        const mCard = document.createElement('div');
+        mCard.style.cssText = `background:linear-gradient(135deg,${mGlow},rgba(0,0,0,0));border:1px solid ${mBorderColor};border-radius:6px;padding:18px 20px;position:relative;overflow:hidden;`;
+        const wrBarW = Math.min(mWR, 100);
+        const lossBarW = mTotal>0 ? Math.min(Math.round((mLosses/mTotal)*100), 100) : 0;
+        const wrColor = mWR>=60?'#10b981':mWR>=40?'#f59e0b':'#ef4444';
+
+        // ── Biggest Profit & Loss (individual trades) ──
+        let biggestProfit = { amount: 0, date: null };
+        let biggestLoss   = { amount: 0, date: null };
+        monthTrades.forEach(t => {
+            if (t.plStatus === 'Profit' && t.amount > biggestProfit.amount) {
+                biggestProfit = { amount: t.amount, date: t.date };
+            }
+            if (t.plStatus === 'Loss' && t.amount > biggestLoss.amount) {
+                biggestLoss = { amount: t.amount, date: t.date };
+            }
+        });
+        const fmtDate = d => { if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-US',{day:'numeric',month:'short'}); };
+
+        // ── Overtrading days (5+ trades in one day) ──
+        const dailyTradeCount = {};
+        monthTrades.forEach(t => { dailyTradeCount[t.date] = (dailyTradeCount[t.date]||0) + 1; });
+        const overtradingDays = Object.entries(dailyTradeCount)
+            .filter(([,c]) => c >= 5)
+            .sort(([a],[b]) => a.localeCompare(b));
+        const otHTML = overtradingDays.length > 0
+            ? overtradingDays.map(([d,c]) =>
+                `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);border-radius:4px;padding:3px 8px;font-size:8px;font-weight:800;color:#fbbf24;letter-spacing:0.5px;">
+                    ${fmtDate(d)} <span style="background:rgba(251,191,36,0.25);border-radius:3px;padding:1px 5px;">${c} trades</span>
+                </span>`
+              ).join('')
+            : `<span style="font-size:9px;font-weight:800;color:#334155;font-style:italic;">No overtrading detected ✓</span>`;
+
+        mCard.innerHTML = `
+            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${mColor};opacity:0.6;border-radius:6px 6px 0 0;"></div>
+
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+                <div>
+                    <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#475569;margin-bottom:3px;">Monthly Summary</p>
+                    <p style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:${mColor};">${mIcon} ${MONTH_NAMES[parseInt(m)]} ${y}</p>
+                </div>
+                <div style="background:${mGlow};border:1px solid ${mBorderColor};border-radius:4px;padding:3px 8px;">
+                    <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:${mColor};">${mLabel}</p>
+                </div>
+            </div>
+
+            <!-- Net P&L -->
+            <div style="margin-bottom:14px;">
+                <p style="font-size:28px;font-weight:800;color:${mColor};letter-spacing:-1px;line-height:1;">${mSign}$${Math.abs(monthNet).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</p>
+                <p style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;">Net P&L for the month</p>
+            </div>
+
+            <!-- WIN RATE -->
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:12px 14px;margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:7px;">
+                        <div style="width:7px;height:7px;border-radius:50%;background:${wrColor};box-shadow:0 0 6px ${wrColor};"></div>
+                        <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;">Win Rate</p>
+                    </div>
+                    <p style="font-size:22px;font-weight:800;color:${wrColor};letter-spacing:-0.5px;line-height:1;">${mWR}%</p>
+                </div>
+                <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;margin-bottom:6px;">
+                    <div style="height:100%;width:${wrBarW}%;background:linear-gradient(90deg,${wrColor},${wrColor}cc);border-radius:99px;box-shadow:0 0 8px ${wrColor}66;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;gap:10px;">
+                        <span style="font-size:9px;font-weight:800;color:#34d399;">✓ ${mWins} Wins</span>
+                        <span style="font-size:9px;font-weight:800;color:#f87171;">✗ ${mLosses} Losses</span>
+                        ${mBe>0?`<span style="font-size:9px;font-weight:800;color:#60a5fa;">~ ${mBe} BE</span>`:''}
+                    </div>
+                    <span style="font-size:8px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:1px;">${mTotal} total</span>
+                </div>
+            </div>
+
+            <!-- BIGGEST PROFIT -->
+            <div style="background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:11px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">🏆</div>
+                    <div>
+                        <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:2px;">Biggest Profit</p>
+                        <p style="font-size:9px;font-weight:800;color:#64748b;">${biggestProfit.date ? fmtDate(biggestProfit.date) : '—'}</p>
+                    </div>
+                </div>
+                <p style="font-size:18px;font-weight:800;color:#10b981;letter-spacing:-0.5px;">${biggestProfit.amount > 0 ? '+$'+biggestProfit.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</p>
+            </div>
+
+            <!-- BIGGEST LOSS -->
+            <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:11px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">💀</div>
+                    <div>
+                        <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:2px;">Biggest Loss</p>
+                        <p style="font-size:9px;font-weight:800;color:#64748b;">${biggestLoss.date ? fmtDate(biggestLoss.date) : '—'}</p>
+                    </div>
+                </div>
+                <p style="font-size:18px;font-weight:800;color:#ef4444;letter-spacing:-0.5px;">${biggestLoss.amount > 0 ? '-$'+biggestLoss.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</p>
+            </div>
+
+            <!-- OVERTRADING ALERT -->
+            <div style="background:${overtradingDays.length>0?'rgba(251,191,36,0.05)':'rgba(255,255,255,0.02)'};border:1px solid ${overtradingDays.length>0?'rgba(251,191,36,0.25)':'rgba(255,255,255,0.07)'};border-radius:6px;padding:11px 14px;margin-bottom:10px;">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                    <span style="font-size:13px;">⚠️</span>
+                    <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:${overtradingDays.length>0?'#fbbf24':'#475569'};">Overtrading Days</p>
+                    ${overtradingDays.length>0?`<span style="margin-left:auto;background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.4);border-radius:3px;padding:1px 7px;font-size:8px;font-weight:800;color:#fbbf24;">${overtradingDays.length} DAY${overtradingDays.length>1?'S':''}</span>`:''}
+                </div>
+                <p style="font-size:8px;font-weight:700;color:#475569;margin-bottom:7px;">Days with 5+ trades taken</p>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;">${otHTML}</div>
+            </div>
+
+            <!-- Bottom stats row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:4px;padding:8px 10px;text-align:center;">
+                    <p style="font-size:18px;font-weight:800;color:#fff;">${mTotal}</p>
+                    <p style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#475569;margin-top:2px;">Total Trades</p>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:4px;padding:8px 10px;text-align:center;">
+                    <p style="font-size:18px;font-weight:800;color:#fff;">${tradedDays.size}</p>
+                    <p style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#475569;margin-top:2px;">Trading Days</p>
+                </div>
+            </div>
+        `;
+        weekGrid.appendChild(mCard);
+    }
+
+    setTimeout(()=>renderMonthBarChart(dailyPnL, tradedDays, daysInMonth, m, y), 30);
+    updateReportPreviewStats(m, y);
+}
+
+function updateReportPreviewStats(m, y) {
+    const monthTrades = globalTrades.filter(t => {
+        const [tY,tM] = t.date.split('-');
+        return tY === y && tM === m;
+    });
+    const statsRow = document.getElementById('reportStatsRow');
+    if (!statsRow) return;
+    if (!monthTrades.length) { statsRow.innerHTML = '<p style="grid-column:1/-1;text-align:center;font-size:10px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:1px;">No trades logged for this month</p>'; return; }
+    let netPnL=0, wins=0, losses=0, bes=0;
+    let bestDay={date:null,pnl:-Infinity}, worstDay={date:null,pnl:Infinity};
+    const dailyMap = {};
+    monthTrades.forEach(t => {
+        const v = t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0;
+        netPnL += v;
+        if(t.plStatus==='Profit') wins++;
+        else if(t.plStatus==='Loss') losses++;
+        else bes++;
+        dailyMap[t.date] = (dailyMap[t.date]||0) + v;
+    });
+    Object.entries(dailyMap).forEach(([d,p]) => {
+        if(p > bestDay.pnl) bestDay = {date:d, pnl:p};
+        if(p < worstDay.pnl) worstDay = {date:d, pnl:p};
+    });
+    const total = wins+losses+bes;
+    const wr = total>0 ? Math.round((wins/total)*100) : 0;
+    const pnlColor = netPnL>=0 ? '#10b981' : '#ef4444';
+    statsRow.innerHTML = `
+        <div class="report-stat-card">
+            <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:6px;">Total Trades</p>
+            <p style="font-size:26px;font-weight:800;color:#fff;">${monthTrades.length}</p>
+            <p style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;">${wins}W  ${losses}L  ${bes}BE</p>
+        </div>
+        <div class="report-stat-card">
+            <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:6px;">Win Rate</p>
+            <p style="font-size:26px;font-weight:800;color:#3b82f6;">${wr}%</p>
+            <p style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;">${wins} wins of ${total}</p>
+        </div>
+        <div class="report-stat-card">
+            <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:6px;">Net P&L</p>
+            <p style="font-size:26px;font-weight:800;color:${pnlColor};">${netPnL>=0?'+':'-'}$${Math.abs(netPnL).toFixed(2)}</p>
+            <p style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;">Monthly total</p>
+        </div>
+        <div class="report-stat-card">
+            <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-bottom:6px;">Best Day</p>
+            <p style="font-size:26px;font-weight:800;color:#10b981;">${bestDay.date?'+$'+Math.abs(bestDay.pnl).toFixed(2):'—'}</p>
+            <p style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;">${bestDay.date||'—'}</p>
+        </div>
+    `;
+}
+
+function generateMonthlyPDF() {
+    const m = document.getElementById('filterMonth').value;
+    const y = document.getElementById('filterYear').value;
+    const email = document.getElementById('reportEmail').value.trim();
+    const btn = document.getElementById('generatePdfBtn');
+    const statusMsg = document.getElementById('pdfStatusMsg');
+
+    const monthTrades = globalTrades.filter(t => {
+        const [tY, tM] = t.date.split('-');
+        return tY === y && tM === m;
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
+    if (!monthTrades.length) {
+        statusMsg.style.color = '#ef4444';
+        statusMsg.innerText = '✕ No trades found for this month';
+        setTimeout(() => statusMsg.innerText = '', 3000);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner"></div> Generating PDF…`;
+    statusMsg.style.color = '#60a5fa';
+    statusMsg.innerText = 'Building your report…';
+
+    setTimeout(() => {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const PW = 210, PH = 297;
+            const margin = 16;
+            let y_pos = margin;
+
+            const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+            const monthName = MONTH_NAMES[parseInt(m)];
+
+            let netPnL = 0, wins = 0, losses = 0, bes = 0;
+            const dailyMap = {}, sessionMap = { Asian:{w:0,l:0,pnl:0}, London:{w:0,l:0,pnl:0}, 'New York':{w:0,l:0,pnl:0} };
+            const symbolMap = {};
+            let bestDay = { date: null, pnl: -Infinity };
+            let worstDay = { date: null, pnl: Infinity };
+
+            monthTrades.forEach(t => {
+                const v = t.plStatus === 'Profit' ? t.amount : t.plStatus === 'Loss' ? -t.amount : 0;
+                netPnL += v;
+                if (t.plStatus === 'Profit') wins++;
+                else if (t.plStatus === 'Loss') losses++;
+                else bes++;
+                dailyMap[t.date] = (dailyMap[t.date] || 0) + v;
+                const sess = t.session || 'Asian';
+                if (!sessionMap[sess]) sessionMap[sess] = {w:0,l:0,pnl:0};
+                sessionMap[sess].pnl += v;
+                if (t.plStatus === 'Profit') sessionMap[sess].w++;
+                else if (t.plStatus === 'Loss') sessionMap[sess].l++;
+                if (!symbolMap[t.symbol]) symbolMap[t.symbol] = {w:0,l:0,pnl:0,trades:0};
+                symbolMap[t.symbol].pnl += v;
+                symbolMap[t.symbol].trades++;
+                if (t.plStatus === 'Profit') symbolMap[t.symbol].w++;
+                else if (t.plStatus === 'Loss') symbolMap[t.symbol].l++;
+            });
+
+            Object.entries(dailyMap).forEach(([d, p]) => {
+                if (p > bestDay.pnl) bestDay = { date: d, pnl: p };
+                if (p < worstDay.pnl) worstDay = { date: d, pnl: p };
+            });
+
+            const total = wins + losses + bes;
+            const wr = total > 0 ? Math.round((wins / total) * 100) : 0;
+            const avgPnl = total > 0 ? netPnL / total : 0;
+
+            const $hex = (h) => { const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16); return [r,g,b]; };
+            const fillRect = (x,y,w,h,hex) => { doc.setFillColor(...$hex(hex)); doc.rect(x, y, w, h, 'F'); };
+            const drawText = (text, x, y, opts={}) => {
+                doc.setFontSize(opts.size || 10);
+                doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
+                doc.setTextColor(...$hex(opts.color || '#ffffff'));
+                if (opts.align) doc.text(String(text), x, y, { align: opts.align });
+                else doc.text(String(text), x, y);
+            };
+
+            fillRect(0, 0, PW, PH, '#020617');
+            fillRect(0, 0, PW, 2, '#3b82f6');
+            fillRect(0, 0, PW, 52, '#040d26');
+
+            drawText('NIX', margin, 18, { size: 22, bold: true, color: '#3b82f6' });
+            drawText('TRADING INTELLIGENCE', margin + 24, 18, { size: 8, color: '#475569' });
+            drawText('MONTHLY PERFORMANCE REPORT', PW - margin, 14, { size: 8, bold: true, color: '#64748b', align: 'right' });
+            drawText(`${monthName.toUpperCase()} ${y}`, PW - margin, 22, { size: 18, bold: true, color: '#ffffff', align: 'right' });
+
+            const traderName = document.getElementById('traderNameInput').value || 'NIX TRADER';
+            drawText(traderName.toUpperCase(), margin, 34, { size: 11, bold: true, color: '#ffffff' });
+            if (email) drawText(email, margin, 41, { size: 8, color: '#475569' });
+            drawText(`Generated: ${new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'})}`, PW - margin, 41, { size: 7, color: '#334155', align: 'right' });
+
+            y_pos = 60;
+
+            const statCols = 4;
+            const statW = (PW - margin * 2 - 9) / statCols;
+            const stats = [
+                { label: 'TOTAL TRADES', value: monthTrades.length, sub: `${wins}W  ${losses}L  ${bes}BE`, color: '#ffffff' },
+                { label: 'WIN RATE', value: `${wr}%`, sub: `${wins} wins of ${total}`, color: '#3b82f6' },
+                { label: 'NET P&L', value: `${netPnL >= 0 ? '+' : '-'}$${Math.abs(netPnL).toFixed(2)}`, sub: 'Monthly total', color: netPnL >= 0 ? '#10b981' : '#ef4444' },
+                { label: 'AVG TRADE', value: `${avgPnl >= 0 ? '+' : '-'}$${Math.abs(avgPnl).toFixed(2)}`, sub: 'Per trade', color: avgPnl >= 0 ? '#10b981' : '#ef4444' },
+            ];
+
+            stats.forEach((s, i) => {
+                const sx = margin + i * (statW + 3);
+                fillRect(sx, y_pos, statW, 30, '#0a1628');
+                fillRect(sx, y_pos, 2, 30, s.color);
+                drawText(s.label, sx + 6, y_pos + 7, { size: 6, bold: true, color: '#475569' });
+                drawText(String(s.value), sx + 6, y_pos + 17, { size: 13, bold: true, color: s.color });
+                drawText(s.sub, sx + 6, y_pos + 24, { size: 6, color: '#334155' });
+            });
+
+            y_pos += 36;
+
+            const bwW = (PW - margin * 2 - 4) / 2;
+            if (bestDay.date) {
+                fillRect(margin, y_pos, bwW, 18, '#0a1628');
+                fillRect(margin, y_pos, 2, 18, '#10b981');
+                drawText('BEST DAY', margin + 6, y_pos + 6, { size: 6, bold: true, color: '#10b981' });
+                drawText(`+$${Math.abs(bestDay.pnl).toFixed(2)}`, margin + 6, y_pos + 13, { size: 10, bold: true, color: '#10b981' });
+                drawText(bestDay.date, margin + bwW - 6, y_pos + 13, { size: 8, bold: true, color: '#334155', align: 'right' });
+            }
+            if (worstDay.date && worstDay.pnl !== Infinity) {
+                const wx = margin + bwW + 4;
+                fillRect(wx, y_pos, bwW, 18, '#0a1628');
+                fillRect(wx, y_pos, 2, 18, '#ef4444');
+                drawText('WORST DAY', wx + 6, y_pos + 6, { size: 6, bold: true, color: '#ef4444' });
+                drawText(`-$${Math.abs(worstDay.pnl).toFixed(2)}`, wx + 6, y_pos + 13, { size: 10, bold: true, color: '#ef4444' });
+                drawText(worstDay.date, wx + bwW - 6, y_pos + 13, { size: 8, bold: true, color: '#334155', align: 'right' });
+            }
+
+            y_pos += 24;
+
+            drawText('SESSION BREAKDOWN', margin, y_pos + 5, { size: 7, bold: true, color: '#475569' });
+            y_pos += 9;
+
+            const sessions = ['Asian', 'London', 'New York'];
+            const sessColors = { Asian: '#f59e0b', London: '#3b82f6', 'New York': '#10b981' };
+            const sessW = (PW - margin * 2 - 6) / 3;
+
+            sessions.forEach((sess, i) => {
+                const sx = margin + i * (sessW + 3);
+                const sd = sessionMap[sess] || { w:0, l:0, pnl:0 };
+                const sc = sessColors[sess];
+                fillRect(sx, y_pos, sessW, 22, '#0a1628');
+                fillRect(sx, y_pos, 2, 22, sc);
+                const sessLabel = sess === 'New York' ? 'NEW YORK' : sess.toUpperCase();
+                drawText(sessLabel, sx + 6, y_pos + 6, { size: 6, bold: true, color: sc });
+                drawText(`${sd.pnl >= 0 ? '+' : '-'}$${Math.abs(sd.pnl).toFixed(2)}`, sx + 6, y_pos + 14, { size: 10, bold: true, color: sd.pnl >= 0 ? '#10b981' : '#ef4444' });
+                drawText(`${sd.w}W  ${sd.l}L`, sx + sessW - 6, y_pos + 14, { size: 8, color: '#475569', align: 'right' });
+            });
+
+            y_pos += 28;
+
+            drawText('SYMBOL PERFORMANCE', margin, y_pos, { size: 7, bold: true, color: '#475569' });
+            y_pos += 5;
+
+            const symEntries = Object.entries(symbolMap).sort((a, b) => b[1].pnl - a[1].pnl);
+            const symCols = Math.min(symEntries.length, 3);
+            const symW = symCols > 0 ? (PW - margin * 2 - (symCols - 1) * 3) / symCols : 0;
+
+            symEntries.slice(0, 6).forEach(([ sym, sd ], i) => {
+                const col = i % symCols;
+                const row = Math.floor(i / symCols);
+                const sx = margin + col * (symW + 3);
+                const sy = y_pos + row * 22;
+                const symColor = sd.pnl >= 0 ? '#10b981' : '#ef4444';
+                fillRect(sx, sy, symW, 18, '#0a1628');
+                fillRect(sx, sy, 2, 18, symColor);
+                drawText(sym, sx + 6, sy + 7, { size: 8, bold: true, color: '#ffffff' });
+                drawText(`${sd.w}W  ${sd.l}L`, sx + 6, sy + 13, { size: 6, color: '#475569' });
+                drawText(`${sd.pnl >= 0 ? '+' : '-'}$${Math.abs(sd.pnl).toFixed(2)}`, sx + symW - 6, sy + 11, { size: 9, bold: true, color: symColor, align: 'right' });
+            });
+
+            const symRows = Math.ceil(symEntries.length / symCols) || 1;
+            y_pos += symRows * 22 + 6;
+
+            drawText('FULL TRADE LOG', margin, y_pos + 5, { size: 7, bold: true, color: '#475569' });
+            y_pos += 9;
+
+            const tableHeaders = ['DATE', 'SYMBOL', 'TYPE', 'LOT', 'SESSION', 'STATUS', 'P&L', 'NOTES'];
+            const colWidths = [22, 20, 14, 12, 22, 18, 20, 0];
+            const remaining = PW - margin * 2 - colWidths.slice(0, -1).reduce((a, b) => a + b, 0);
+            colWidths[colWidths.length - 1] = remaining;
+
+            fillRect(margin, y_pos, PW - margin * 2, 7, '#0a1f44');
+            let cx = margin;
+            tableHeaders.forEach((h, i) => {
+                drawText(h, cx + 2, y_pos + 5, { size: 5.5, bold: true, color: '#3b82f6' });
+                cx += colWidths[i];
+            });
+            y_pos += 7;
+
+            monthTrades.forEach((t, idx) => {
+                if (y_pos > PH - 20) {
+                    doc.addPage();
+                    fillRect(0, 0, PW, PH, '#020617');
+                    y_pos = margin;
+                    fillRect(margin, y_pos, PW - margin * 2, 7, '#0a1f44');
+                    let hx = margin;
+                    tableHeaders.forEach((h, i) => { drawText(h, hx + 2, y_pos + 5, { size: 5.5, bold: true, color: '#3b82f6' }); hx += colWidths[i]; });
+                    y_pos += 7;
+                }
+
+                const rowH = 8;
+                const rowBg = idx % 2 === 0 ? '#060e20' : '#030810';
+                fillRect(margin, y_pos, PW - margin * 2, rowH, rowBg);
+
+                const v = t.plStatus === 'Profit' ? t.amount : t.plStatus === 'Loss' ? -t.amount : 0;
+                const pnlColor = v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#3b82f6';
+                const statusColor = t.plStatus === 'Profit' ? '#10b981' : t.plStatus === 'Loss' ? '#ef4444' : '#3b82f6';
+
+                const rowVals = [
+                    t.date, t.symbol, t.type, t.lotSize || '1.00', t.session || 'Asian', t.plStatus,
+                    `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`,
+                    t.reason && t.reason !== 'N/A' ? t.reason.slice(0, 30) + (t.reason.length > 30 ? '…' : '') : '—'
+                ];
+                const rowColors = ['#94a3b8','#ffffff','#94a3b8','#64748b','#94a3b8', statusColor, pnlColor,'#475569'];
+
+                let rx = margin;
+                rowVals.forEach((val, i) => {
+                    drawText(String(val), rx + 2, y_pos + 5.5, { size: 5.5, color: rowColors[i] });
+                    rx += colWidths[i];
+                });
+                y_pos += rowH;
+            });
+
+            y_pos += 10;
+            if (y_pos > PH - 20) { doc.addPage(); fillRect(0, 0, PW, PH, '#020617'); y_pos = margin; }
+
+            doc.setDrawColor(30, 50, 90);
+            doc.setLineWidth(0.3);
+            doc.line(margin, y_pos, PW - margin, y_pos);
+            y_pos += 6;
+
+            drawText('NIX — NEXT INTELLIGENT EXECUTION', margin, y_pos, { size: 7, bold: true, color: '#1e3a5f' });
+            drawText(`Confidential · ${monthName} ${y} · ${traderName.toUpperCase()}`, PW - margin, y_pos, { size: 6, color: '#1e3a5f', align: 'right' });
+            if (email) { y_pos += 5; drawText(email, PW - margin, y_pos, { size: 6, color: '#1e3a5f', align: 'right' }); }
+
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+                doc.setPage(p);
+                fillRect(0, PH - 8, PW, 8, '#030810');
+                drawText(`PAGE ${p} / ${totalPages}`, PW / 2, PH - 2.5, { size: 5.5, color: '#1e3a5f', align: 'center' });
+            }
+
+            const fileName = `NIX_Report_${monthName}_${y}.pdf`;
+            doc.save(fileName);
+
+            statusMsg.style.color = '#10b981';
+            statusMsg.innerText = `✓ ${fileName} downloaded!`;
+            setTimeout(() => statusMsg.innerText = '', 5000);
+
+        } catch(err) {
+            console.error(err);
+            statusMsg.style.color = '#ef4444';
+            statusMsg.innerText = '✕ PDF generation failed. Check console.';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Generate & Download PDF`;
+    }, 100);
+}
+
+function renderMonthBarChart(dailyPnL, tradedDays, daysInMonth, month, year) {
+    const canvas = document.getElementById('monthBarChart');
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || canvas.parentElement.offsetWidth;
+    const H = 240;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+
+    if (!tradedDays.size) {
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.font = '800 11px Plus Jakarta Sans';
+        ctx.textAlign = 'center';
+        ctx.fillText('NO TRADE DATA FOR THIS MONTH', W/2, H/2);
+        return;
+    }
+
+    const pad = { t: 20, r: 16, b: 36, l: 60 };
+    const cW = W - pad.l - pad.r;
+    const cH = H - pad.t - pad.b;
+
+    const vals = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds = String(d).padStart(2,'0');
+        vals.push({ d, ds, v: tradedDays.has(ds) ? (dailyPnL[ds] || 0) : null });
+    }
+
+    const tradedVals = vals.filter(x => x.v !== null).map(x => x.v);
+    const maxAbs = Math.max(...tradedVals.map(v => Math.abs(v)), 1);
+    const zeroY = pad.t + cH / 2;
+    const barW = Math.max(4, Math.floor((cW / daysInMonth) * 0.65));
+    const gap   = cW / daysInMonth;
+
+    const gridTicks = 4;
+    ctx.font = '700 9px Plus Jakarta Sans';
+    ctx.textAlign = 'right';
+    for (let i = -gridTicks; i <= gridTicks; i++) {
+        const v = (maxAbs / gridTicks) * i;
+        const y = zeroY - (v / maxAbs) * (cH / 2);
+        if (y < pad.t - 2 || y > pad.t + cH + 2) continue;
+        ctx.strokeStyle = i === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = i === 0 ? 1.5 : 1;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        ctx.fillStyle = 'rgba(100,116,139,0.8)';
+        ctx.fillText((v >= 0 ? '+' : '') + '$' + Math.round(v), pad.l - 6, y + 3);
+    }
+
+    const barMeta = [];
+    vals.forEach(({ d, ds, v }) => {
+        if (v === null) return;
+        const cx = pad.l + (d - 0.5) * gap;
+        const x  = cx - barW / 2;
+        const normH = Math.abs(v) / maxAbs * (cH / 2);
+        const minH  = normH < 2 ? 2 : normH;
+        let color, glowColor;
+        if (v > 0)      { color = '#10b981'; glowColor = 'rgba(16,185,129,0.5)'; }
+        else if (v < 0) { color = '#ef4444'; glowColor = 'rgba(239,68,68,0.5)'; }
+        else            { color = '#3b82f6'; glowColor = 'rgba(59,130,246,0.5)'; }
+        const barY = v >= 0 ? zeroY - minH : zeroY;
+        const barH = minH;
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur  = 8;
+        const grad = ctx.createLinearGradient(0, barY, 0, barY + barH);
+        if (v > 0) { grad.addColorStop(0, '#10b981'); grad.addColorStop(1, 'rgba(16,185,129,0.4)'); }
+        else if (v < 0) { grad.addColorStop(0, 'rgba(239,68,68,0.4)'); grad.addColorStop(1, '#ef4444'); }
+        else { grad.addColorStop(0, '#3b82f6'); grad.addColorStop(1, 'rgba(59,130,246,0.6)'); }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        const r = Math.min(3, barW / 2);
+        if (v >= 0) {
+            ctx.moveTo(x + r, barY); ctx.lineTo(x + barW - r, barY);
+            ctx.arcTo(x + barW, barY, x + barW, barY + r, r);
+            ctx.lineTo(x + barW, barY + barH); ctx.lineTo(x, barY + barH);
+            ctx.arcTo(x, barY, x + r, barY, r);
+        } else {
+            ctx.moveTo(x, barY); ctx.lineTo(x + barW, barY);
+            ctx.lineTo(x + barW, barY + barH - r);
+            ctx.arcTo(x + barW, barY + barH, x + barW - r, barY + barH, r);
+            ctx.lineTo(x + r, barY + barH);
+            ctx.arcTo(x, barY + barH, x, barY + barH - r, r);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0;
+        barMeta.push({ x, cx, barY, barW, barH, v, d, color });
+    });
+
+    ctx.fillStyle = 'rgba(100,116,139,0.7)';
+    ctx.font = '700 9px Plus Jakarta Sans';
+    ctx.textAlign = 'center';
+    vals.forEach(({ d }) => {
+        if (d % 5 === 0 || d === 1) {
+            const cx = pad.l + (d - 0.5) * gap;
+            ctx.fillText(d, cx, H - pad.b + 14);
+        }
+    });
+
+    const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    ctx.fillStyle = 'rgba(100,116,139,0.4)';
+    ctx.font = '700 9px Plus Jakarta Sans';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${monthNames[parseInt(month)]} ${year}`, W - pad.r, H - 4);
+
+    const tip = document.getElementById('barTooltip');
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        let hit = null;
+        for (const b of barMeta) { if (mx >= b.x - 4 && mx <= b.x + b.barW + 4) { hit = b; break; } }
+        if (hit) {
+            const sign = hit.v > 0 ? '+' : hit.v < 0 ? '-' : '±';
+            const label = hit.v > 0 ? 'PROFIT' : hit.v < 0 ? 'LOSS' : 'BREAKEVEN';
+            tip.innerHTML = `<span style="color:${hit.color};font-size:13px">${sign}$${Math.abs(hit.v).toFixed(2)}</span><br><span style="color:#64748b;font-size:9px;font-weight:700">DAY ${hit.d} &nbsp;·&nbsp; ${label}</span>`;
+            const tx = Math.min(hit.cx + 10, W - 120);
+            const ty = Math.max(hit.v >= 0 ? hit.barY - 44 : hit.barY + hit.barH + 6, pad.t);
+            tip.style.left = tx + 'px';
+            tip.style.top  = ty + 'px';
+            tip.style.display = 'block';
+        } else { tip.style.display = 'none'; }
+    };
+    canvas.onmouseleave = () => { tip.style.display = 'none'; };
+}
+
+window.addEventListener('resize', () => {
+    if (!document.getElementById('dashboardView').classList.contains('hidden-view')) {
+        renderChart();
+        if (!document.getElementById('weeklyContent').classList.contains('hidden-view')) calculateWeeklyReport();
+    }
+});
+
+AOS.init({duration:1000,once:true});
+lucide.createIcons();
+
+// ─── GOALS & GAMIFICATION ──────────────────────────────────────────────
+
+function getGoalKey(m, y) { return `nixGoal_${y}_${m}`; }
+
+function saveMonthlyTarget() {
+    const m = document.getElementById('goalMonth').value;
+    const y = document.getElementById('goalYear').value;
+    const val = parseFloat(document.getElementById('monthlyTargetInput').value || '0');
+    if (val <= 0) { alert('Please enter a valid target amount.'); return; }
+    localStorage.setItem(getGoalKey(m, y), val.toString());
+    renderGoalsView();
+}
+
+function renderGoalsView() {
+    const now = new Date();
+    // Sync month/year selects to today by default if not set
+    const gm = document.getElementById('goalMonth');
+    const gy = document.getElementById('goalYear');
+    const hy = document.getElementById('heatmapYear');
+    if (!gm._init) { gm.value = String(now.getMonth()+1).padStart(2,'0'); gy.value = String(now.getFullYear()); hy.value = String(now.getFullYear()); gm._init=true; }
+
+    const m = gm.value, y = gy.value;
+    const hYear = hy.value;
+    const savedTarget = parseFloat(localStorage.getItem(getGoalKey(m, y)) || '0');
+
+    // Load saved target into input
+    if (savedTarget > 0) document.getElementById('monthlyTargetInput').value = savedTarget;
+
+    // ── Calculate month P&L ──
+    const monthTrades = globalTrades.filter(t => { const [tY,tM]=t.date.split('-'); return tY===y && tM===m; });
+    let monthNet=0, mWins=0, mLosses=0, greenDays=new Set(), redDays=new Set();
+    const dailyPnLMap={}, dailyCountMap={};
+    monthTrades.forEach(t => {
+        const v = t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0;
+        monthNet += v;
+        if(t.plStatus==='Profit') mWins++;
+        else if(t.plStatus==='Loss') mLosses++;
+        dailyPnLMap[t.date] = (dailyPnLMap[t.date]||0)+v;
+        dailyCountMap[t.date] = (dailyCountMap[t.date]||0)+1;
+    });
+    Object.entries(dailyPnLMap).forEach(([d,p])=>{ if(p>0) greenDays.add(d); else if(p<0) redDays.add(d); });
+
+    // ── Target Progress ──
+    const tpc = document.getElementById('targetProgressContent');
+    if (savedTarget > 0) {
+        const pct = Math.min((monthNet / savedTarget) * 100, 100);
+        const reached = monthNet >= savedTarget;
+        const pColor = reached ? '#10b981' : monthNet > 0 ? '#3b82f6' : '#ef4444';
+        const pBar = Math.max(pct, 0);
+        const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        tpc.innerHTML = `
+            <div style="margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px;">
+                    <div>
+                        <p style="font-size:24px;font-weight:800;color:${pColor};line-height:1;">${monthNet>=0?'+':'-'}$${Math.abs(monthNet).toFixed(2)}</p>
+                        <p style="font-size:9px;color:#475569;font-weight:700;margin-top:2px;">of $${savedTarget.toLocaleString()} goal · ${MONTH_NAMES[parseInt(m)]} ${y}</p>
+                    </div>
+                    <p style="font-size:20px;font-weight:800;color:${pColor};">${Math.round(pct)}%</p>
+                </div>
+                <div style="height:10px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden;position:relative;">
+                    <div style="height:100%;width:${pBar}%;background:linear-gradient(90deg,${pColor},${pColor}bb);border-radius:99px;box-shadow:0 0 12px ${pColor}55;transition:width 0.8s ease;"></div>
+                </div>
+                ${reached ? `<p style="font-size:10px;font-weight:800;color:#10b981;margin-top:6px;text-transform:uppercase;letter-spacing:1px;">🎉 Goal Reached! Outstanding work!</p>` : `<p style="font-size:9px;color:#334155;font-weight:700;margin-top:5px;text-transform:uppercase;">$${Math.max(savedTarget-monthNet,0).toFixed(2)} remaining to hit your goal</p>`}
+        `;
+    } else {
+        tpc.innerHTML = `<p style="font-size:11px;font-weight:800;color:#334155;font-style:italic;">Set a target to see your progress →</p>`;
+    }
+
+    // ── BADGES ──
+    renderBadges(greenDays, monthTrades, dailyCountMap, y, m);
+
+    // ── HEATMAP ──
+    renderHeatmap(hYear);
+
+    // ── XP ──
+    computeXP();
+}
+
+// ─── BADGE DEFINITIONS ────────────────────────────────────────────────────────
+const BADGE_DEFS = [
+    { id:'first_trade',   icon:'🚀', name:'First Step',        desc:'Log your very first trade',                       xp:10,  check: (all)=>all.length>=1 },
+    { id:'ten_trades',    icon:'📋', name:'Committed',          desc:'Log 10 trades total',                             xp:25,  check: (all)=>all.length>=10 },
+    { id:'fifty_trades',  icon:'💼', name:'Veteran',            desc:'Log 50 trades total',                             xp:75,  check: (all)=>all.length>=50 },
+    { id:'first_profit',  icon:'💰', name:'First Blood',        desc:'Make your first profitable trade',                xp:15,  check: (all)=>all.some(t=>t.plStatus==='Profit') },
+    { id:'green_day',     icon:'🌱', name:'Green Day',          desc:'Have a profitable trading day',                   xp:20,  check: (all,_,gd)=>gd.size>=1 },
+    { id:'five_green',    icon:'🔥', name:'On Fire',            desc:'Achieve 5 profitable days in a month',            xp:50,  check: (all,_,gd)=>gd.size>=5 },
+    { id:'no_overtrade',  icon:'🧘', name:'Disciplined',        desc:'No overtrading day (5+ trades) in the month',     xp:40,  check: (all,dc)=>!Object.values(dc).some(c=>c>=5) && all.length>0 },
+    { id:'win_streak_3',  icon:'⚡', name:'Hot Streak',         desc:'Win 3 trades in a row',                           xp:35,  check: (all)=>{ let s=0,max=0; [...all].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{ if(t.plStatus==='Profit'){s++;max=Math.max(max,s);}else s=0;}); return max>=3; } },
+    { id:'win_streak_5',  icon:'🌪️', name:'Unstoppable',        desc:'Win 5 trades in a row',                           xp:60,  check: (all)=>{ let s=0,max=0; [...all].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{ if(t.plStatus==='Profit'){s++;max=Math.max(max,s);}else s=0;}); return max>=5; } },
+    { id:'goal_reached',  icon:'🎯', name:'Goal Crusher',       desc:'Hit your monthly profit target',                  xp:100, check: (all,dc,gd,net,target)=>target>0 && net>=target },
+    { id:'k_profit',      icon:'💎', name:'Four Figures',       desc:'Make $1,000+ profit in a single month',           xp:80,  check: (all,dc,gd,net)=>net>=1000 },
+    { id:'perfect_week',  icon:'🏆', name:'Perfect Week',       desc:'Every traded day in a week is green',             xp:70,  check: (all)=>{ const byDate={}; all.forEach(t=>{ const v=t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0; byDate[t.date]=(byDate[t.date]||0)+v; }); const dates=Object.keys(byDate).sort(); if(dates.length<5)return false; for(let i=0;i<=dates.length-5;i++){ const week=dates.slice(i,i+5); if(week.every(d=>byDate[d]>0)) return true; } return false; } },
+    { id:'comeback',      icon:'💪', name:'The Comeback',       desc:'End a month profitable after 3+ losing days',     xp:55,  check: (all,dc,gd,net,_,rd)=>net>0 && rd.size>=3 },
+    { id:'centurion',     icon:'🎖️', name:'Centurion',          desc:'Log 100 trades total',                            xp:150, check: (all)=>all.length>=100 },
+];
+
+function renderBadges(greenDays, monthTrades, dailyCountMap, y, m) {
+    const container = document.getElementById('badgesGrid');
+    container.innerHTML = '';
+    const allTrades = globalTrades;
+    const allDailyCount = {};
+    allTrades.forEach(t=>{ allDailyCount[t.date]=(allDailyCount[t.date]||0)+1; });
+    const allGreenDays = new Set();
+    const allRedDays = new Set();
+    const allDailyPnL = {};
+    allTrades.forEach(t=>{ const v=t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0; allDailyPnL[t.date]=(allDailyPnL[t.date]||0)+v; });
+    Object.entries(allDailyPnL).forEach(([d,p])=>{ if(p>0) allGreenDays.add(d); else if(p<0) allRedDays.add(d); });
+
+    // month-specific
+    const monthTrades2 = globalTrades.filter(t=>{ const [tY,tM]=t.date.split('-'); return tY===y && tM===m; });
+    let mNet=0; monthTrades2.forEach(t=>{ mNet+=t.plStatus==='Profit'?t.amount:t.plStatus==='Loss'?-t.amount:0; });
+    const savedTarget = parseFloat(localStorage.getItem(getGoalKey(m, y))||'0');
+
+    let totalXP = 0;
+    BADGE_DEFS.forEach(b => {
+        let unlocked = false;
+        try { unlocked = b.check(allTrades, allDailyCount, allGreenDays, mNet, savedTarget, allRedDays); } catch(e){}
+        if (unlocked) totalXP += b.xp;
+
+        const card = document.createElement('div');
+        card.style.cssText = unlocked
+            ? `background:linear-gradient(135deg,rgba(251,191,36,0.12),rgba(245,158,11,0.04));border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:16px;text-align:center;position:relative;overflow:hidden;transition:transform 0.2s;cursor:default;`
+            : `background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px;text-align:center;position:relative;overflow:hidden;opacity:0.45;filter:grayscale(1);`;
+        card.innerHTML = `
+            ${unlocked ? `<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#fbbf24,#f59e0b);"></div>` : ''}
+            <div style="font-size:28px;margin-bottom:8px;line-height:1;">${b.icon}</div>
+            <p style="font-size:10px;font-weight:800;color:${unlocked?'#fbbf24':'#475569'};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${b.name}</p>
+            <p style="font-size:8px;font-weight:700;color:${unlocked?'#92400e':'#334155'};line-height:1.4;margin-bottom:8px;">${b.desc}</p>
+            <div style="display:inline-flex;align-items:center;gap:4px;background:${unlocked?'rgba(251,191,36,0.2)':'rgba(255,255,255,0.05)'};border:1px solid ${unlocked?'rgba(251,191,36,0.4)':'rgba(255,255,255,0.08)'};border-radius:99px;padding:2px 10px;">
+                <span style="font-size:9px;font-weight:800;color:${unlocked?'#fbbf24':'#334155'};">+${b.xp} XP</span>
+            </div>
+            ${unlocked ? `<div style="position:absolute;top:8px;right:8px;width:16px;height:16px;background:#fbbf24;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;">✓</div>` : `<div style="position:absolute;top:8px;right:8px;font-size:10px;color:#334155;">🔒</div>`}
+        `;
+        container.appendChild(card);
+    });
+    document.getElementById('xpDisplay').innerText = totalXP.toLocaleString();
+}
+
+function computeXP() {
+    // Already handled inside renderBadges
+}
+
+function renderHeatmap(year) {
+    const grid = document.getElementById('heatmapGrid');
+    const monthLabels = document.getElementById('heatmapMonthLabels');
+    grid.innerHTML = ''; monthLabels.innerHTML = '';
+
+    // Build daily trade counts for the year
+    const dailyData = {};
+    globalTrades.forEach(t => {
+        if (!t.date.startsWith(year)) return;
+        dailyData[t.date] = (dailyData[t.date]||0)+1;
+    });
+    const maxCount = Math.max(...Object.values(dailyData), 1);
+
+    const startDate = new Date(`${year}-01-01`);
+    const endDate   = new Date(`${year}-12-31`);
+
+    // Shift to Monday start: find the Monday on or before Jan 1
+    const startDow = startDate.getDay(); // 0=Sun
+    const mondayOffset = startDow === 0 ? 6 : startDow - 1;
+    const gridStart = new Date(startDate);
+    gridStart.setDate(gridStart.getDate() - mondayOffset);
+
+    // Build columns (weeks)
+    const columns = [];
+    let current = new Date(gridStart);
+    let lastMonth = -1;
+    let colIdx = 0;
+
+    while (current <= endDate || current.getDay() !== 1) {
+        const col = [];
+        for (let d = 0; d < 7; d++) {
+            col.push(new Date(current));
+            current.setDate(current.getDate() + 1);
+        }
+        columns.push(col);
+
+        // Month label — show at start of each new month
+        const firstInYear = col.find(d => d >= startDate && d <= endDate);
+        if (firstInYear) {
+            const mo = firstInYear.getMonth();
+            if (mo !== lastMonth) {
+                lastMonth = mo;
+                const lbl = document.createElement('div');
+                const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                lbl.style.cssText = `font-size:8px;font-weight:800;color:#475569;text-transform:uppercase;width:${(col.length)*16}px;min-width:${16}px;flex-shrink:0;`;
+                lbl.innerText = MNAMES[mo];
+                monthLabels.appendChild(lbl);
+            }
+        }
+        colIdx++;
+        if (current > endDate && current.getDay() === 1) break;
+    }
+
+    // Render columns
+    columns.forEach(col => {
+        const colDiv = document.createElement('div');
+        colDiv.style.cssText = 'display:flex;flex-direction:column;gap:3px;flex-shrink:0;';
+        col.forEach(day => {
+            const cell = document.createElement('div');
+            const ds = day.toISOString().slice(0,10);
+            const count = dailyData[ds] || 0;
+            const inYear = day >= startDate && day <= endDate;
+            let bg = 'rgba(255,255,255,0.04)';
+            let border = '1px solid rgba(255,255,255,0.06)';
+            if (inYear && count > 0) {
+                const intensity = Math.min(count / Math.max(maxCount, 4), 1);
+                if (intensity < 0.25)      bg = 'rgba(167,139,250,0.25)';
+                else if (intensity < 0.5)  bg = 'rgba(167,139,250,0.5)';
+                else if (intensity < 0.75) bg = 'rgba(167,139,250,0.75)';
+                else                        bg = '#a78bfa';
+                border = '1px solid rgba(167,139,250,0.4)';
+            }
+            if (!inYear) { bg='transparent'; border='none'; }
+            cell.style.cssText = `width:13px;height:13px;border-radius:2px;background:${bg};border:${border};cursor:${count>0?'pointer':'default'};transition:transform 0.1s;flex-shrink:0;`;
+            if (count > 0) {
+                cell.title = `${ds}: ${count} trade${count>1?'s':''}`;
+                cell.onmouseenter = () => { cell.style.transform='scale(1.4)'; };
+                cell.onmouseleave = () => { cell.style.transform='scale(1)'; };
+            }
+            colDiv.appendChild(cell);
+        });
+        grid.appendChild(colDiv);
+    });
+
+    // Streak stats
+    const allDates = Object.keys(dailyData).filter(d=>d.startsWith(year)).sort();
+    let curStreak=0, maxStreak=0, tempStreak=0, prevDate=null;
+    allDates.forEach(d=>{
+        const dt=new Date(d+'T00:00:00');
+        if(prevDate){const diff=(dt-prevDate)/864e5; if(diff===1){tempStreak++;}else{tempStreak=1;} }else{tempStreak=1;}
+        maxStreak=Math.max(maxStreak,tempStreak);
+        prevDate=dt;
+    });
+    // Current streak — count backwards from today
+    const today=new Date(); let cs=0; let chk=new Date(today);
+    while(true){ const ds2=chk.toISOString().slice(0,10); if(dailyData[ds2]){cs++;chk.setDate(chk.getDate()-1);}else break; }
+    curStreak=cs;
+
+    const ssEl = document.getElementById('streakStats');
+    ssEl.innerHTML = `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:14px;text-align:center;">
+            <p style="font-size:26px;font-weight:800;color:#a78bfa;">${curStreak}</p>
+            <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-top:4px;">Current Streak</p>
+            <p style="font-size:8px;color:#334155;font-weight:700;margin-top:2px;">consecutive days</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:14px;text-align:center;">
+            <p style="font-size:26px;font-weight:800;color:#a78bfa;">${maxStreak}</p>
+            <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-top:4px;">Best Streak</p>
+            <p style="font-size:8px;color:#334155;font-weight:700;margin-top:2px;">longest run in ${year}</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:14px;text-align:center;">
+            <p style="font-size:26px;font-weight:800;color:#a78bfa;">${allDates.length}</p>
+            <p style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#475569;margin-top:4px;">Active Days</p>
+            <p style="font-size:8px;color:#334155;font-weight:700;margin-top:2px;">in ${year}</p>
+        </div>
+    `;
+}
+
+// ─── FOREX SESSION CLOCK (IST) ─────────────────────────────────────────
+const SESSIONS = [
+    { name:'Asian',    emoji:'🌏', startH:5,  startM:30, endH:14, endM:30, activeColor:'rgba(234,179,8,0.18)',   activeBorder:'rgba(234,179,8,0.6)',   activeText:'#fbbf24', dotColor:'#fbbf24' },
+    { name:'London',   emoji:'🇬🇧', startH:12, startM:30, endH:21, endM:30, activeColor:'rgba(59,130,246,0.18)',  activeBorder:'rgba(59,130,246,0.6)',  activeText:'#60a5fa', dotColor:'#3b82f6' },
+    { name:'New York', emoji:'🗽', startH:17, startM:30, endH:26, endM:30, activeColor:'rgba(16,185,129,0.18)',  activeBorder:'rgba(16,185,129,0.6)',  activeText:'#34d399', dotColor:'#10b981' },
+];
+
+function getISTDate() {
+    const now=new Date(); const utcMs=now.getTime()+now.getTimezoneOffset()*60000;
+    return new Date(utcMs+5.5*3600000);
+}
+function isSessionActive(s,totalMins) {
+    const start=s.startH*60+s.startM, end=s.endH*60+s.endM;
+    if(end<=1440) return totalMins>=start&&totalMins<end;
+    return totalMins>=start||totalMins<(end-1440);
+}
+function formatSessionTime(h,m) {
+    const hh=h%24, ampm=hh>=12?'PM':'AM', disp=hh%12===0?12:hh%12;
+    return `${disp}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function minutesUntil(s,totalMins) { const start=s.startH*60+s.startM; let diff=start-totalMins; if(diff<0)diff+=1440; return diff; }
+function minutesLeft(s,totalMins)  { const end=s.endH*60+s.endM;     let diff=end-totalMins;   if(diff<0)diff+=1440; return diff; }
+function formatHM(mins) { const h=Math.floor(mins/60),m=mins%60; return h>0?`${h}h ${m}m`:`${m}m`; }
+
+function renderSessionClocks() {
+    const container=document.getElementById('sessionClocks');
+    const istClock=document.getElementById('istClock');
+    const istDate=document.getElementById('istDate');
+    if(!container||!istClock) return;
+    const ist=getISTDate();
+    const totalMins=ist.getHours()*60+ist.getMinutes();
+    const hh=ist.getHours(),mm=ist.getMinutes(),ss=ist.getSeconds();
+    const ampm=hh>=12?'PM':'AM', h12=hh%12===0?12:hh%12;
+    istClock.innerText=`${h12}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')} ${ampm}`;
+    istDate.innerText=ist.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'}).toUpperCase();
+    container.innerHTML='';
+    SESSIONS.forEach(s=>{
+        const active=isSessionActive(s,totalMins);
+        const openStr=formatSessionTime(s.startH,s.startM);
+        const closeStr=formatSessionTime(s.endH%24,s.endM);
+        const subText=active?`CLOSES IN ${formatHM(minutesLeft(s,totalMins))}`:`OPENS IN ${formatHM(minutesUntil(s,totalMins))}`;
+        const bg=active?s.activeColor:'rgba(255,255,255,0.03)';
+        const border=active?s.activeBorder:'rgba(255,255,255,0.07)';
+        const nameC=active?s.activeText:'#64748b';
+        const subC=active?s.activeText:'#334155';
+        const row=document.createElement('div');
+        row.style.cssText=`background:${bg};border:1px solid ${border};border-radius:5px;padding:8px 10px;transition:all 0.4s;`;
+        row.innerHTML=`
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px;">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                    ${active?`<span style="width:6px;height:6px;border-radius:50%;background:${s.dotColor};box-shadow:0 0 6px ${s.dotColor};display:inline-block;animation:blink 1.2s infinite;flex-shrink:0"></span>`:`<span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.12);display:inline-block;flex-shrink:0"></span>`}
+                    <span style="font-size:10px;font-weight:800;color:${nameC};text-transform:uppercase;letter-spacing:1px;white-space:nowrap;">${s.emoji} ${s.name}</span>
+                </div>
+                <span style="font-size:9px;font-weight:800;color:${nameC};opacity:0.9;white-space:nowrap;flex-shrink:0;">${openStr} – ${closeStr}</span>
+            </div>
+            <p style="font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${subC};padding-left:12px;">${subText}</p>
+        `;
+        container.appendChild(row);
+    });
+}
+
+renderSessionClocks();
+setInterval(renderSessionClocks,1000);
+</script>
+</body>
+</html>
