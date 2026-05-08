@@ -674,13 +674,16 @@
             <form id="lForm" onsubmit="handleLogin(event)" class="space-y-6">
                 <div><label>Email</label><input type="email" id="lEmail" required></div>
                 <div><label>Passkey</label><input type="password" id="lPass" required></div>
+                <p id="authError" style="color:#f87171;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;text-align:center;min-height:14px;"></p>
                 <button type="submit" class="btn-white w-full">Access Terminal</button>
+                <p style="text-align:center;font-size:9px;color:#334155;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:-8px;">All data stored locally on your device</p>
             </form>
             <form id="rForm" onsubmit="handleRegister(event)" class="space-y-6 hidden">
                 <div><label>Operator Name</label><input type="text" id="rName" required></div>
                 <div><label>Terminal Email</label><input type="email" id="rEmail" required></div>
-                <div><label>Secure Passkey</label><input type="password" id="rPass" required></div>
+                <div><label>Secure Passkey (min 6 chars)</label><input type="password" id="rPass" required minlength="6"></div>
                 <button type="submit" class="btn-blue w-full">Initialize Operator</button>
+                <p style="text-align:center;font-size:9px;color:#334155;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:-8px;">No cloud required — works fully offline</p>
             </form>
         </div>
     </div>
@@ -738,10 +741,60 @@
 </div>
 
 <script>
-const firebaseConfig = { apiKey: "AIzaSyBEztvUeHF2do0coPcKna_F3R4AaoiKRCA", authDomain: "nix-journal.firebaseapp.com", projectId: "nix-journal", storageBucket: "nix-journal.firebasestorage.app", messagingSenderId: "478114595791", appId: "1:478114595791:web:766a04781531516a3b08ba" };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore(), auth = firebase.auth(), storage = firebase.storage();
+// ─── NIX LOCAL AUTH + STORAGE ENGINE ─────────────────────────────────────────
+// All auth is handled locally (localStorage). Firestore is used for trade sync
+// only when available — if it fails, everything falls back to localStorage.
+// This completely bypasses Firebase Auth quota issues.
+
+let db = null, firestoreAvailable = false;
+try {
+    const firebaseConfig = { apiKey: "AIzaSyBEztvUeHF2do0coPcKna_F3R4AaoiKRCA", authDomain: "nix-journal.firebaseapp.com", projectId: "nix-journal", storageBucket: "nix-journal.firebasestorage.app", messagingSenderId: "478114595791", appId: "1:478114595791:web:766a04781531516a3b08ba" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firestoreAvailable = true;
+} catch(e) { console.warn('Firebase init failed, using localStorage only.'); }
+
 let globalTrades = [], pendingImgFile = null;
+let currentUserId = null; // local user id
+
+// ── LOCAL AUTH HELPERS ────────────────────────────────────────────────────────
+function hashPass(pass) {
+    // Simple deterministic hash — not cryptographic but fine for local offline use
+    let h = 0;
+    for (let i = 0; i < pass.length; i++) { h = (Math.imul(31, h) + pass.charCodeAt(i)) | 0; }
+    return h.toString(36);
+}
+function getUsers() { return JSON.parse(localStorage.getItem('nix_users') || '{}'); }
+function saveUsers(u) { localStorage.setItem('nix_users', JSON.stringify(u)); }
+function setSession(uid) { localStorage.setItem('nix_session', uid); }
+function getSession() { return localStorage.getItem('nix_session'); }
+function clearSession() { localStorage.removeItem('nix_session'); }
+
+// ── LOCAL TRADE STORAGE ───────────────────────────────────────────────────────
+function localTradesKey(uid) { return `nix_trades_${uid}`; }
+function getLocalTrades(uid) { return JSON.parse(localStorage.getItem(localTradesKey(uid)) || '[]'); }
+function saveLocalTrades(uid, trades) { localStorage.setItem(localTradesKey(uid), JSON.stringify(trades)); }
+
+// ── INIT: check for existing session on page load ─────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+    const uid = getSession();
+    if (uid) {
+        const users = getUsers();
+        if (users[uid]) {
+            enterDashboard(users[uid].name, uid);
+        } else {
+            clearSession();
+            showLanding();
+        }
+    } else {
+        showLanding();
+    }
+});
+
+function showLanding() {
+    document.getElementById('landingView').classList.remove('hidden-view');
+    document.getElementById('dashboardView').classList.add('hidden-view');
+}
 
 function toggleSidebar() {
     const aside = document.getElementById('dashboardAside');
@@ -760,6 +813,20 @@ function switchAuth(t) {
     document.getElementById('tabL').classList.toggle('text-gray-500', t==='reg');
     document.getElementById('tabR').classList.toggle('border-white', t==='reg');
     document.getElementById('tabR').classList.toggle('text-gray-500', t==='login');
+    // clear errors
+    const err = document.getElementById('authError');
+    if (err) err.innerText = '';
+}
+
+function showAuthError(msg) {
+    let err = document.getElementById('authError');
+    if (!err) {
+        err = document.createElement('p');
+        err.id = 'authError';
+        err.style.cssText = 'color:#f87171;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-top:-8px;';
+        document.getElementById('lForm').appendChild(err);
+    }
+    err.innerText = msg;
 }
 
 function openLightbox(url) {
@@ -771,36 +838,63 @@ function closeLightbox() {
     document.getElementById('lightboxImg').src = '';
 }
 
-auth.onAuthStateChanged(async u => {
-    if (u) {
-        const doc = await db.collection("users").doc(u.uid).get();
-        enterDashboard(doc.exists ? doc.data().name : "O");
-    } else {
-        document.getElementById('landingView').classList.remove('hidden-view');
-        document.getElementById('dashboardView').classList.add('hidden-view');
+// ── AUTH HANDLERS (100% LOCAL — no Firebase Auth) ─────────────────────────────
+function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('lEmail').value.trim().toLowerCase();
+    const pass  = document.getElementById('lPass').value;
+    const users = getUsers();
+    const uid   = Object.keys(users).find(k => users[k].email === email);
+    if (!uid) { showAuthError('⚠ No account found with that email.'); return; }
+    if (users[uid].passHash !== hashPass(pass)) { showAuthError('⚠ Incorrect passkey. Try again.'); return; }
+    setSession(uid);
+    enterDashboard(users[uid].name, uid);
+    toggleModal('loginModal');
+}
+
+function handleRegister(e) {
+    e.preventDefault();
+    const name  = document.getElementById('rName').value.trim();
+    const email = document.getElementById('rEmail').value.trim().toLowerCase();
+    const pass  = document.getElementById('rPass').value;
+    if (!name || !email || !pass) { alert('All fields required.'); return; }
+    if (pass.length < 6) { alert('Passkey must be at least 6 characters.'); return; }
+    const users = getUsers();
+    const exists = Object.values(users).find(u => u.email === email);
+    if (exists) { alert('An account with this email already exists. Please login.'); return; }
+    const uid = 'nix_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    users[uid] = { name, email, passHash: hashPass(pass), createdAt: Date.now() };
+    saveUsers(users);
+    setSession(uid);
+    enterDashboard(name, uid);
+    toggleModal('loginModal');
+}
+
+function handleLogout() {
+    if (confirm('Exit NIX?')) {
+        clearSession();
+        location.reload();
     }
-});
-async function handleLogin(e) { e.preventDefault(); try { await auth.signInWithEmailAndPassword(document.getElementById('lEmail').value, document.getElementById('lPass').value); } catch(err){alert(err.message);} }
-async function handleRegister(e) { e.preventDefault(); try { const c = await auth.createUserWithEmailAndPassword(document.getElementById('rEmail').value, document.getElementById('rPass').value); await db.collection("users").doc(c.user.uid).set({name:document.getElementById('rName').value,email:document.getElementById('rEmail').value}); } catch(err){alert(err.message);} }
-function handleLogout() { if(confirm("Exit NIX?")) auth.signOut(); }
+}
 
 async function saveTraderName() {
-    const u = auth.currentUser; if (!u) return;
+    if (!currentUserId) return;
     const name = document.getElementById('traderNameInput').value.trim();
     if (!name) return;
     const btn = document.getElementById('saveNameBtn');
     const status = document.getElementById('nameSaveStatus');
     btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
-    try {
-        await db.collection("users").doc(u.uid).set({ name: name }, { merge: true });
-        document.getElementById('alphaAvatar').innerText = name.charAt(0).toUpperCase();
-        status.style.opacity = '1';
-        setTimeout(() => { status.style.opacity = '0'; }, 2200);
-    } catch(e) { alert('Save failed: ' + e.message); }
+    // Save to local users store
+    const users = getUsers();
+    if (users[currentUserId]) { users[currentUserId].name = name; saveUsers(users); }
+    document.getElementById('alphaAvatar').innerText = name.charAt(0).toUpperCase();
+    status.style.opacity = '1';
+    setTimeout(() => { status.style.opacity = '0'; }, 2200);
     btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
 }
 
-function enterDashboard(name) {
+function enterDashboard(name, uid) {
+    currentUserId = uid;
     document.getElementById('landingView').classList.add('hidden-view');
     document.getElementById('loginModal').classList.add('hidden');
     document.getElementById('dashboardView').classList.remove('hidden-view');
@@ -814,7 +908,6 @@ function enterDashboard(name) {
     const nameInput = document.getElementById('traderNameInput');
     nameInput.addEventListener('input', () => { const v = nameInput.value.trim(); avatar.innerText = v.charAt(0).toUpperCase() || '?'; });
     nameInput.addEventListener('keydown', e => { if(e.key==='Enter') { nameInput.blur(); saveTraderName(); } });
-    // Init goals selects
     document.getElementById('goalMonth').value = String(d.getMonth()+1).padStart(2,'0');
     document.getElementById('goalYear').value = String(d.getFullYear());
     document.getElementById('heatmapYear').value = String(d.getFullYear());
@@ -884,18 +977,51 @@ function resetImageUpload() {
 }
 
 async function addTrade() {
-    const u = auth.currentUser; if (!u) return;
+    if (!currentUserId) return;
     const statusEl = document.getElementById('uploadStatus');
     statusEl.innerText = 'Saving…';
-    const tempId = db.collection("trades").doc().id;
     let imgURL = null;
-    if (pendingImgFile) { statusEl.innerText = 'Processing screenshot…'; try { imgURL = await uploadTradeImage(); } catch(e){ alert('Image processing failed: '+e.message); statusEl.innerText=''; return; } }
-    await db.collection("trades").doc(tempId).set({ userId:u.uid, symbol:document.getElementById('symbol').value, date:document.getElementById('date').value, plStatus:document.getElementById('plStatus').value, amount:parseFloat(document.getElementById('amount').value||"0"), lotSize:document.getElementById('lotSize').value||"1.00", type:document.getElementById('type').value, session:document.getElementById('session').value||"Asian", reason:document.getElementById('reason').value||"N/A", imgURL:imgURL||null, timestamp:firebase.firestore.FieldValue.serverTimestamp() });
+    if (pendingImgFile) {
+        statusEl.innerText = 'Processing screenshot…';
+        try { imgURL = await uploadTradeImage(); } catch(e) { alert('Image error: '+e.message); statusEl.innerText=''; return; }
+    }
+    const trade = {
+        id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        userId: currentUserId,
+        symbol: document.getElementById('symbol').value,
+        date: document.getElementById('date').value,
+        plStatus: document.getElementById('plStatus').value,
+        amount: parseFloat(document.getElementById('amount').value||'0'),
+        lotSize: document.getElementById('lotSize').value||'1.00',
+        type: document.getElementById('type').value,
+        session: document.getElementById('session').value||'Asian',
+        reason: document.getElementById('reason').value||'N/A',
+        imgURL: imgURL||null,
+        timestamp: Date.now()
+    };
+    // Save locally
+    const trades = getLocalTrades(currentUserId);
+    trades.push(trade);
+    saveLocalTrades(currentUserId, trades);
+    // Also try Firestore (best-effort, silent fail)
+    if (firestoreAvailable && db) {
+        try { await db.collection('trades').doc(trade.id).set(trade); } catch(e) {}
+    }
     ['symbol','lotSize','amount','reason'].forEach(id => document.getElementById(id).value='');
     document.getElementById('date').valueAsDate = new Date();
-    resetImageUpload(); statusEl.innerText='✓ Trade committed'; setTimeout(()=>statusEl.innerText='',3000);
+    resetImageUpload();
+    statusEl.innerText = '✓ Trade committed';
+    setTimeout(() => statusEl.innerText='', 3000);
+    refreshTradesList();
 }
-async function deleteTrade(id) { if(confirm("Permanently delete?")) await db.collection("trades").doc(id).delete(); }
+
+async function deleteTrade(id) {
+    if (!confirm('Permanently delete?')) return;
+    const trades = getLocalTrades(currentUserId).filter(t => t.id !== id);
+    saveLocalTrades(currentUserId, trades);
+    if (firestoreAvailable && db) { try { await db.collection('trades').doc(id).delete(); } catch(e) {} }
+    refreshTradesList();
+}
 
 function openEditModal(id) {
     const t = globalTrades.find(x => x.id === id); if (!t) return;
@@ -918,12 +1044,23 @@ async function saveEditTrade() {
     const id = document.getElementById('editModal').dataset.editId; if (!id) return;
     const btn = document.querySelector('#editModal .btn-blue');
     btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; btn.innerText = 'Saving…';
-    try {
-        await db.collection("trades").doc(id).update({ symbol:document.getElementById('editSymbol').value, date:document.getElementById('editDate').value, plStatus:document.getElementById('editPlStatus').value, amount:parseFloat(document.getElementById('editAmount').value||'0'), lotSize:document.getElementById('editLotSize').value||'1.00', type:document.getElementById('editType').value, session:document.getElementById('editSession').value, reason:document.getElementById('editReason').value||'N/A' });
-        const st = document.getElementById('editSaveStatus'); st.style.opacity = '1';
-        setTimeout(() => { st.style.opacity = '0'; closeEditModal(); }, 1400);
-    } catch(e) { alert('Update failed: ' + e.message); }
+    const updates = {
+        symbol: document.getElementById('editSymbol').value,
+        date: document.getElementById('editDate').value,
+        plStatus: document.getElementById('editPlStatus').value,
+        amount: parseFloat(document.getElementById('editAmount').value||'0'),
+        lotSize: document.getElementById('editLotSize').value||'1.00',
+        type: document.getElementById('editType').value,
+        session: document.getElementById('editSession').value,
+        reason: document.getElementById('editReason').value||'N/A'
+    };
+    const trades = getLocalTrades(currentUserId).map(t => t.id===id ? {...t,...updates} : t);
+    saveLocalTrades(currentUserId, trades);
+    if (firestoreAvailable && db) { try { await db.collection('trades').doc(id).update(updates); } catch(e) {} }
+    const st = document.getElementById('editSaveStatus'); st.style.opacity = '1';
+    setTimeout(() => { st.style.opacity = '0'; closeEditModal(); }, 1400);
     btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; btn.innerText = '✓ Update Trade';
+    refreshTradesList();
 }
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('editModal').addEventListener('click', e => { if (e.target === document.getElementById('editModal')) closeEditModal(); });
@@ -1037,32 +1174,34 @@ function updateStats() {
 }
 
 function startRealtimeSync() {
-    db.collection("trades").where("userId","==",auth.currentUser.uid).onSnapshot(snap => {
-        const list=document.getElementById('historyList'); list.innerHTML="";
-        let tp=0,w=0,l=0; globalTrades=[];
-        snap.forEach(doc=>globalTrades.push({id:doc.id,...doc.data()}));
-        globalTrades.sort((a,b)=>b.date.localeCompare(a.date));
-        globalTrades.forEach(t=>{
-            let c='text-blue-400',sign='±';
-            if(t.plStatus==='Profit'){c='text-emerald-400';sign='+';tp+=t.amount;w++;}
-            else if(t.plStatus==='Loss'){c='text-red-400';sign='-';tp-=t.amount;l++;}
-            const imgHTML=t.imgURL?`<img src="${t.imgURL}" class="trade-img" alt="Trade chart" onclick="openLightbox('${t.imgURL}')" title="Click to enlarge">`:'';
-            const card=document.createElement('div'); card.className="glass-panel p-8 relative overflow-hidden mb-5";
-            const sessionEmoji=t.session==='London'?'🇬🇧':t.session==='New York'?'🗽':'🌏';
-            const sessionLabel=t.session||'Asian';
-            card.innerHTML=`<div style="position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:50"><div onclick="openEditModal('${t.id}')" title="Edit trade" style="background:rgba(59,130,246,0.15);color:#3b82f6;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(59,130,246,0.3);font-size:11px;">✎</div><div onclick="deleteTrade('${t.id}')" title="Delete trade" style="background:rgba(239,68,68,0.15);color:#ef4444;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(239,68,68,0.3);font-size:12px;">✕</div></div><div class="flex justify-between items-center pr-16"><div><p class="font-black text-xl">${t.symbol}</p><p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${t.date}</p><span style="display:inline-block;margin-top:5px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:3px;border:1px solid rgba(255,255,255,0.08)">${sessionEmoji} ${sessionLabel}</span></div><div class="text-right"><p class="text-2xl font-black ${c}">${sign}$${t.amount.toLocaleString()}</p><p class="text-[10px] text-gray-500 uppercase font-bold">${t.type} • ${t.lotSize} LOT</p></div></div><div class="mt-4 p-4 bg-white/5 rounded-md text-xs italic text-gray-400">"${t.reason}"</div>${imgHTML}`;
-            list.appendChild(card);
-        });
-        const wr=(w+l)>0?Math.round((w/(w+l))*100):0;
-        document.getElementById('winRateDisplay').innerText=`${wr}%`;
-        const netPnL=tp;
-        document.getElementById('netPnLDisplay').innerText=`${netPnL>=0?'+':'-'}$${Math.abs(netPnL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-        document.getElementById('netPnLDisplay').className=`text-4xl font-black ${netPnL>0?'text-emerald-400':netPnL<0?'text-red-400':'text-white'}`;
-        setTimeout(renderChart,50);
-        if (!document.getElementById('weeklyContent').classList.contains('hidden-view')) calculateWeeklyReport();
-        if (!document.getElementById('goalsContent').classList.contains('hidden-view')) renderGoalsView();
-        lucide.createIcons();
+    refreshTradesList();
+}
+
+function refreshTradesList() {
+    if (!currentUserId) return;
+    globalTrades = getLocalTrades(currentUserId).sort((a,b)=>b.date.localeCompare(a.date));
+    const list = document.getElementById('historyList'); list.innerHTML='';
+    let tp=0, w=0, l=0;
+    globalTrades.forEach(t => {
+        let c='text-blue-400', sign='±';
+        if(t.plStatus==='Profit'){c='text-emerald-400';sign='+';tp+=t.amount;w++;}
+        else if(t.plStatus==='Loss'){c='text-red-400';sign='-';tp-=t.amount;l++;}
+        const imgHTML = t.imgURL ? `<img src="${t.imgURL}" class="trade-img" alt="Trade chart" onclick="openLightbox('${t.imgURL}')" title="Click to enlarge">` : '';
+        const card = document.createElement('div'); card.className='glass-panel p-8 relative overflow-hidden mb-5';
+        const sessionEmoji = t.session==='London'?'🇬🇧':t.session==='New York'?'🗽':'🌏';
+        const sessionLabel = t.session||'Asian';
+        card.innerHTML=`<div style="position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:50"><div onclick="openEditModal('${t.id}')" title="Edit trade" style="background:rgba(59,130,246,0.15);color:#3b82f6;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(59,130,246,0.3);font-size:11px;">✎</div><div onclick="deleteTrade('${t.id}')" title="Delete trade" style="background:rgba(239,68,68,0.15);color:#ef4444;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;border:1px solid rgba(239,68,68,0.3);font-size:12px;">✕</div></div><div class="flex justify-between items-center pr-16"><div><p class="font-black text-xl">${t.symbol}</p><p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${t.date}</p><span style="display:inline-block;margin-top:5px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:3px;border:1px solid rgba(255,255,255,0.08)">${sessionEmoji} ${sessionLabel}</span></div><div class="text-right"><p class="text-2xl font-black ${c}">${sign}$${t.amount.toLocaleString()}</p><p class="text-[10px] text-gray-500 uppercase font-bold">${t.type} • ${t.lotSize} LOT</p></div></div><div class="mt-4 p-4 bg-white/5 rounded-md text-xs italic text-gray-400">"${t.reason}"</div>${imgHTML}`;
+        list.appendChild(card);
     });
+    const wr=(w+l)>0?Math.round((w/(w+l))*100):0;
+    document.getElementById('winRateDisplay').innerText=`${wr}%`;
+    const netPnL=tp;
+    document.getElementById('netPnLDisplay').innerText=`${netPnL>=0?'+':'-'}$${Math.abs(netPnL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    document.getElementById('netPnLDisplay').className=`text-4xl font-black ${netPnL>0?'text-emerald-400':netPnL<0?'text-red-400':'text-white'}`;
+    setTimeout(renderChart, 50);
+    if (!document.getElementById('weeklyContent').classList.contains('hidden-view')) calculateWeeklyReport();
+    if (!document.getElementById('goalsContent').classList.contains('hidden-view')) renderGoalsView();
+    lucide.createIcons();
 }
 
 function calculateWeeklyReport() {
